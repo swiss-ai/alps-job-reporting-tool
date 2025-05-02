@@ -43,7 +43,7 @@ To collect and process data for a given SLURM job, follow these steps:
 
 2. Run the following command from the main directory:
 
-    ```./scripts/submit_snapshot_saver.sh <job_id> [duration]```
+    ```.metrics_downloader.sh <job_id> [duration]```
 
     - <job_id>: The SLURM job ID for which data will be collected.
     - [duration] (optional): The logging period in seconds for node data collection. The default is 300 seconds.

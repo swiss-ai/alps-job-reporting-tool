@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Set base directory for logs
-#BASE_DIR="/capstor/store/cscs/swissai/a06/users/schlag/straggler_log"
-#BASE_DIR="/users/ndegiorgi/store/straggler_log"
 BASE_DIR="."
 
 

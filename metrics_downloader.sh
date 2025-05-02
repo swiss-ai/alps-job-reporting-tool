@@ -13,8 +13,8 @@
 # ------------------------------------------------------------------
 
 # ====== CONFIGURATION ======
-SNAPSHOT_SCRIPT="./scripts/save_snapshot.sh"
-PYTHON_SCRIPT="./scripts/prepare_data.py"
+SNAPSHOT_SCRIPT="./lib/save_snapshot.sh"
+PYTHON_SCRIPT="./lib/prepare_data.py"
 # ===========================
 
 # Display help message
