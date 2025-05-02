@@ -3,13 +3,15 @@
 # Set base directory for logs
 BASE_DIR="."
 
-
 # Retrieve SLURM job ID and node name
 JOB_ID="${SLURM_JOB_ID:-unknown_job}"
 NODE_NAME="${SLURMD_NODENAME:-$(hostname)}"
 
+# Get the current date in the format DAY-MONTH-YEAR
+CURRENT_DATE=$(date +%d-%m-%Y)
+
 # Define output directory and file
-OUTPUT_DIR="${BASE_DIR}/outputs/${JOB_ID}"
+OUTPUT_DIR="${BASE_DIR}/outputs/${JOB_ID}_${CURRENT_DATE}"
 OUTPUT_FILE="${OUTPUT_DIR}/${NODE_NAME}.log"
 
 # Create output directory if it doesn't exist
