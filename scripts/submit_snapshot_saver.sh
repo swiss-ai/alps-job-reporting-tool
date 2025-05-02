@@ -13,13 +13,27 @@
 # ------------------------------------------------------------------
 
 # ====== CONFIGURATION ======
-#SNAPSHOT_SCRIPT="/capstor/store/cscs/swissai/a06/users/schlag/straggler_log/save_snapshot.sh"
-#SNAPSHOT_SCRIPT="/users/ndegiorgi/store/straggler_log/save_snapshot.sh"
-#PYTHON_SCRIPT="/users/ndegiorgi/store/straggler_log/prepare_data.py"
-
 SNAPSHOT_SCRIPT="./scripts/save_snapshot.sh"
 PYTHON_SCRIPT="./scripts/prepare_data.py"
 # ===========================
+
+# Display help message
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    echo "Usage: $0 <job_id> [duration]"
+    echo
+    echo "Arguments:"
+    echo "  <job_id>    The SLURM job ID for which the snapshot saver will run."
+    echo "  [duration]  Optional. Duration in seconds for the snapshot saver to run. Default is 300 seconds."
+    echo
+    echo "Description:"
+    echo "  This script runs the save_snapshot.sh script on all nodes of a given SLURM job."
+    echo "  After the snapshot saver completes, it runs a Python script to process the data."
+    echo
+    echo "Example:"
+    echo "  $0 12345 600"
+    echo "  This runs the snapshot saver for job ID 12345 with a duration of 600 seconds."
+    exit 0
+fi
 
 # Check for job ID argument
 if [ -z "$1" ]; then
@@ -43,15 +57,16 @@ fi
 echo "Launching $SNAPSHOT_SCRIPT on all nodes of job $JOB_ID..."
 
 # Launch one srun per node in the background
+NODE_COUNT=0
 for NODE in $NODELIST; do
-    echo "  -> Launching on $NODE"
     srun --overlap --jobid="$JOB_ID" --nodes=1 --ntasks=1 -w "$NODE" bash "$SNAPSHOT_SCRIPT" --duration "$DURATION" &
+    NODE_COUNT=$((NODE_COUNT + 1))
 done
 
 # Wait for all background sruns to finish
 wait
 
-echo "Snapshot script launched on all nodes."
+echo "Finished data logging on $NODE_COUNT nodes."
 
 # Start the Python script to prepare the data for analysis
 echo "Starting Python script: $PYTHON_SCRIPT"

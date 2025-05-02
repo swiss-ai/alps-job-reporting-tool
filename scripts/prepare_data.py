@@ -10,7 +10,7 @@ def parse_log_file(file_path):
     """Parse a single log file and return a dataframe"""
     try:
         node_id = os.path.basename(file_path).split('.')[0]
-        print(f"Processing {node_id}")
+        #print(f"Processing {node_id}")
         
         with open(file_path, 'r') as f:
             lines = f.readlines()
@@ -70,7 +70,7 @@ def parse_log_file(file_path):
             print(f"  No valid data rows found in {file_path}")
             return None
             
-        print(f"  Successfully parsed {len(data)} rows from {file_path}")
+        #print(f"  Successfully parsed {len(data)} rows from {file_path}")
         
         # Create dataframe
         df = pd.DataFrame(data, columns=headers)
@@ -161,16 +161,10 @@ def main():
     parser.add_argument("--job-id", required=True, help="SLURM Job ID")
     args = parser.parse_args()
 
-    print(f"Job ID: {args.job_id}")
-
     directory = f"./outputs/{args.job_id}/"
     if not os.path.exists(directory):
         print(f"Directory {directory} does not exist.")
         sys.exit(1)
-
-    print(f"directory: {directory}")
-
-    #df_dict = create_df_dict(directory)
 
     combined_df = process_all_logs(directory)
 

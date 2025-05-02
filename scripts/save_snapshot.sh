@@ -46,10 +46,10 @@ done
 SAMPLES=$((DURATION * 1000 / INTERVAL))
 
 # Start monitoring
-echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
+#echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
 dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
 done > "${OUTPUT_FILE}"
 
-echo "Monitoring complete. Output saved to ${OUTPUT_FILE}"
+#echo "Monitoring complete. Output saved to ${OUTPUT_FILE}"
 
