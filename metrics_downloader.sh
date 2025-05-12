@@ -15,6 +15,8 @@
 # ====== CONFIGURATION ======
 SNAPSHOT_SCRIPT="./lib/save_snapshot.sh"
 PYTHON_SCRIPT="./lib/prepare_data.py"
+REPORT_SCRIPT="./lib/report.py"
+TEMPLATE_FILE="./lib/template.html"
 # ===========================
 
 # Display help message
@@ -72,5 +74,11 @@ echo "Finished data logging on $NODE_COUNT nodes."
 echo "Starting Python script: $PYTHON_SCRIPT"
 python3 "$PYTHON_SCRIPT" --job-id "$JOB_ID"
 
-echo "Python script execution completed."
+# Start the reporting script once the Python script is done
+echo "Starting reporting script: $REPORT_SCRIPT"
+CURRENT_DATE=$(date +%d-%m-%Y)
+INPUT_FILE="./outputs/${JOB_ID}_${CURRENT_DATE}/data_${JOB_ID}_${CURRENT_DATE}.parquet"
+OUTPUT_FILE="./outputs/${JOB_ID}_${CURRENT_DATE}/${JOB_ID}_report.html"
+python3 "$REPORT_SCRIPT" --input_file "$INPUT_FILE"  --template_file "$TEMPLATE_FILE" --output_file "$OUTPUT_FILE"
+
 

@@ -164,21 +164,24 @@ def main():
     # get the current date in the format DAY-MONTH-YEAR
     current_date = datetime.now().strftime("%d-%m-%Y")
 
-    directory = f"./outputs/{args.job_id}_{current_date}"
-    if not os.path.exists(directory):
-        print(f"Directory {directory} does not exist.")
+    # prepare the paths used in the script
+    logs_directory = f"./outputs/{args.job_id}_{current_date}/logs"
+    output_file = f"./outputs/{args.job_id}_{current_date}/data_{args.job_id}_{current_date}"
+
+    if not os.path.exists(logs_directory):
+        print(f"Directory {logs_directory} does not exist.")
         sys.exit(1)
 
-    combined_df = process_all_logs(directory)
+    combined_df = process_all_logs(logs_directory)
 
     if combined_df is not None:
         # Save to CSV
-        output_csv = f"{directory}/data_{args.job_id}_{current_date}.csv"
+        output_csv = f"{output_file}.csv"
         combined_df.to_csv(output_csv)
         print(f"Data saved to {output_csv}")
         
         # Save to parquet (more efficient for large datasets)
-        output_parquet = f"{directory}/data_{args.job_id}_{current_date}.parquet"
+        output_parquet = f"{output_file}.parquet"
         combined_df.to_parquet(output_parquet)
         print(f"Data saved to {output_parquet}")
 

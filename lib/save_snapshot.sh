@@ -11,8 +11,9 @@ NODE_NAME="${SLURMD_NODENAME:-$(hostname)}"
 CURRENT_DATE=$(date +%d-%m-%Y)
 
 # Define output directory and file
-OUTPUT_DIR="${BASE_DIR}/outputs/${JOB_ID}_${CURRENT_DATE}"
-OUTPUT_FILE="${OUTPUT_DIR}/${NODE_NAME}.log"
+OUTPUT_DIR="${BASE_DIR}/outputs/${JOB_ID}_${CURRENT_DATE}/logs"
+GPU_OUTPUT_FILE="${OUTPUT_DIR}/${NODE_NAME}_gpu.log"
+CPU_OUTPUT_FILE="${OUTPUT_DIR}/${NODE_NAME}_cpu.log"
 
 # Create output directory if it doesn't exist
 mkdir -p "${OUTPUT_DIR}"
@@ -46,10 +47,17 @@ done
 SAMPLES=$((DURATION * 1000 / INTERVAL))
 
 # Start monitoring
-#echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
+# echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
 dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
-done > "${OUTPUT_FILE}"
+done > "${GPU_OUTPUT_FILE}"
+
+# Start CPU monitoring and filter for summary lines
+# echo "Starting CPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
+# top -b -d 1 -n "${DURATION}" | grep -E "Tasks:|%Cpu|MiB Mem|MiB Swap" | while read -r line; do
+#     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
+# done > "${CPU_OUTPUT_FILE}" &
+# CPU_MONITOR_PID=$!
 
 #echo "Monitoring complete. Output saved to ${OUTPUT_FILE}"
 
