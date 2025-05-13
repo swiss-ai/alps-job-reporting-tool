@@ -213,6 +213,7 @@ def get_temp_statistics(gpu_data):
     """
 
     # prepare data for temp stats
+    gpu_data['time'] = gpu_data['timestamp'].dt.round('s')
     time_data = gpu_data.groupby('time')[['gract', 'smact', 'tenso', 'tmptr', 'power']]
 
     # prepare the plots
