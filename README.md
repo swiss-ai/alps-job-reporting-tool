@@ -16,17 +16,17 @@ Follow these steps to set up the tool:
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/swiss-ai/alps-job-reporting-tool
    cd alps-job-reporting-tool
    ```
 
 2. Create a Python environment using the `requirements.txt` file:
-    - with conda
+    - with [conda](https://docs.conda.io/):
         ```
         conda create --name myenv --file requirements.txt
         conda activate myenv
         ```
-    - with pip
+    - with [pip](https://pypi.org/project/pip/)
         ```
         python -m venv myenv
         source myenv/bin/activate  # On Windows, use myenv\Scripts\activate
@@ -43,10 +43,12 @@ To collect and process data for a given SLURM job, follow these steps:
 
 2. Run the following command from the main directory:
 
-    ```.metrics_downloader.sh <job_id> [duration]```
+   ```sh
+   ./metrics_downloader.sh <job_id> [duration]
+   ```
 
-    - <job_id>: The SLURM job ID for which data will be collected.
-    - [duration] (optional): The logging period in seconds for node data collection. The default is 300 seconds.
+    - `<job_id>`: The SLURM job ID for which data will be collected.
+    - `[duration]` (optional): The logging period in seconds for node data collection. The default is 300 seconds.
 3. The collected data and an html report will be saved in the `outputs/<job_id>_<date>` folder.
 
 ### Comments

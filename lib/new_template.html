@@ -236,47 +236,71 @@
 <body>
 
 <div class="container">
-    {{ header}}
+    <header>
+        <h1>Alps Job Report</h1>
+        <p>Job from {{ start_time }} to {{ end_time }}.</p>
+        <p>Report generated on {{ current_date }}.</p>
+    </header>
 
     <h2>Key Statistics</h2>
-    {{ key_statistics}}
 
-    <!--<div class="summary-box">
-    </div>-->
+    <div class="stats-container">
+        {% for title, value, color in key_statistics %}
+            <div class="stat-card card-{{ color }}">
+                <h3>{{ title }}</h3>
+                <p>{{ value }}</p>
+            </div>
+        {% endfor %}
+    </div>
 
-    <!-- Here all the different tabs with the content are generated! -->
-    {{tabs}}
+    <div class="tab-container">
+        <div class="tab-buttons">
+            {% for name, content in tabs.items() %}
+                <a href="#{{ name | slug }}" class="tab-button">{{ name }}</a>
+            {% endfor %}
+        </div>
+
+        <!-- Tabs -->
+        {% for name, content in tabs.items() %}
+            <div id="{{ name | slug }}" class="tab-content">
+                <h2>{{ name }}</h2>
+
+                {% for plot in content %}
+                    <div class="plot-parent">
+                        {{ plot | safe }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
 </div>
 
 <script>
+    function setActiveTab(tabButton) {
+        document.querySelectorAll('.tab-content').forEach(function (tabContent) {
+            tabContent.classList.add('hidden');
+        });
+
+        document.querySelectorAll('.tab-button').forEach(function (button) {
+            button.classList.remove('active');
+        });
+
+        tabButton.classList.add('active');
+
+        document.querySelector(tabButton.getAttribute('href')).classList.remove('hidden');
+    }
+
     document.querySelectorAll('a.tab-button').forEach(function (tabButton) {
         tabButton.addEventListener('click', function (event) {
             event.preventDefault();
 
-            document.querySelectorAll('.tab-content').forEach(function (tabContent) {
-                tabContent.classList.add('hidden');
-            });
-
-            document.querySelectorAll('.tab-button').forEach(function (button) {
-                button.classList.remove('active');
-            });
-
-            tabButton.classList.add('active');
-
-            document.querySelector(tabButton.getAttribute('href')).classList.remove('hidden');
+            setActiveTab(tabButton)
         });
     });
 
     // Hide tabs only after complete loading to ensure plots are correctly rendered
     document.addEventListener('DOMContentLoaded', function () {
-        const defaultTab = document.querySelector('.tab-button.active');
-        const defaultTabId = defaultTab.getAttribute('href').substring(1);
-
-        document.querySelectorAll('.tab-content').forEach(function (tabContent) {
-            if (tabContent.id !== defaultTabId) { // Keep default tab visible
-                tabContent.classList.add('hidden');
-            }
-        });
+        setActiveTab(document.querySelector('.tab-button'));
     });
 </script>
 

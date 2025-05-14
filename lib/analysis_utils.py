@@ -1,13 +1,6 @@
-# basic imports
-import pandas as pd
-import numpy as np
-
-# plotting imports
-import jinja2
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.io as pio
 from plotly.subplots import make_subplots
 
 
@@ -21,9 +14,11 @@ def parse_gpu_data(input_file):
 
     return df
 
+
 # visualization functions
 def fig_to_html(fig):
     return fig.to_html(include_plotlyjs=False, full_html=False)
+
 
 def plot_time_series(df, y_col, title, y_label, include_std=False):
     """
@@ -75,6 +70,7 @@ def plot_time_series(df, y_col, title, y_label, include_std=False):
 
     return fig_to_html(fig)
 
+
 def generate_plotly_table(dataframe):
     """
     Generate an interactive HTML table using Plotly.
@@ -107,6 +103,7 @@ def generate_plotly_table(dataframe):
     # Return the HTML of the table
     return fig_to_html(fig)
 
+
 # data analysis functions
 def get_key_statistics(gpu_data):
     """
@@ -125,21 +122,21 @@ def get_key_statistics(gpu_data):
     stats.append([
         "Total nodes",
         gpu_data['node_id'].nunique(),
-        "stat-card"
+        "primary"
     ])
 
     # Total GPUs
     stats.append([
         "Total GPUs",
         gpu_data.groupby(['node_id', 'gpu_id']).ngroups,
-        "stat-card"
+        "primary"
     ])
 
     # Anomalies detected
     stats.append([
         "Anomalies detected",
         "TO-DO",
-        "stat-card card-warning"
+        "warning"
     ])
 
     # Reporting Duration
@@ -149,10 +146,11 @@ def get_key_statistics(gpu_data):
     stats.append([
         "Reporting Duration (min)",
         f"{minutes}:{seconds:02d}",  # Format as MM:SS
-        "stat-card"
+        "primary"
     ])
 
     return stats
+
 
 def get_overview_statistics(gpu_data):
     """
@@ -176,7 +174,6 @@ def get_overview_statistics(gpu_data):
         'power': 'mean'
     }).reset_index()
 
-
     # Power vs Tensor Usage plot
     power_vs_tenso = px.scatter(
         node_avg,
@@ -195,9 +192,9 @@ def get_overview_statistics(gpu_data):
         color_continuous_scale='Viridis',
     )
 
-
     # return the overview statistics
-    return "overview", "Cluster Overview", [fig_to_html(power_vs_tenso)]
+    return [fig_to_html(power_vs_tenso)]
+
 
 def get_temp_statistics(gpu_data):
     """
@@ -271,8 +268,8 @@ def get_temp_statistics(gpu_data):
 
         #temp_outliers_count['anomaly'] = 'temperature'
 
-    # return the temperature statistics
-    return "temp", "Temperature Analysis", plots
+    return plots
+
 
 def get_power_statistics(gpu_data):
     """
@@ -345,7 +342,8 @@ def get_power_statistics(gpu_data):
         #power_outliers_count['anomaly'] = 'power'
         #anomalies = pd.concat([anomalies, power_outliers_count])
 
-        return "power", "Power Analysis", plots
+        return plots
+
 
 def get_activity_statistics(gpu_data):
     """
@@ -399,7 +397,8 @@ def get_activity_statistics(gpu_data):
     activity_timeline.update_yaxes(title_text='Graphic Activity', secondary_y=True)
     plots.append(fig_to_html(activity_timeline))
 
-    return "activity", "GPUs Activity", plots
+    return plots
+
 
 def get_anomalies_statistics(gpu_data):
     """
@@ -461,4 +460,4 @@ def get_anomalies_statistics(gpu_data):
     anomalies_table = generate_plotly_table(anomalies)
 
     # return the anomaly statistics
-    return "anomalies", "Anomalies", [anomalies_table]
+    return [anomalies_table]
