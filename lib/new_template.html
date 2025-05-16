@@ -172,6 +172,7 @@
             overflow-x: auto;
             padding: 0.5rem;
             margin: -0.5rem;
+            max-height: 500px;
         }
 
         table {
@@ -183,7 +184,7 @@
         }
 
         th, td {
-            padding: 0.8rem 1rem;
+            padding: 0.4rem 0.8rem;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
@@ -265,10 +266,33 @@
             <div id="{{ name | slug }}" class="tab-content">
                 <h2>{{ name }}</h2>
 
-                {% for plot in content %}
-                    <div class="plot-parent">
-                        {{ plot | safe }}
-                    </div>
+                {% for figure in content %}
+                    {% if figure.columns is defined %}
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        {% for header in figure.columns %}
+                                            <th>{{ header }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for _, row in figure.iterrows() %}
+                                        <tr>
+                                            {% for cell in figure.columns %}
+                                                <td>{{ row[cell] }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="plot-parent">
+                            {{ figure | plot | safe }}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endfor %}

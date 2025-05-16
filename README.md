@@ -26,7 +26,7 @@ Follow these steps to set up the tool:
         conda create --name myenv --file requirements.txt
         conda activate myenv
         ```
-    - with [pip](https://pypi.org/project/pip/)
+    - with [pip](https://pypi.org/project/pip/):
         ```
         python -m venv myenv
         source myenv/bin/activate  # On Windows, use myenv\Scripts\activate

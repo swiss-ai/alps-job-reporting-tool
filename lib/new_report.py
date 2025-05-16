@@ -3,13 +3,14 @@ from datetime import datetime
 
 import jinja2
 import plotly.io as pio
+from plotly.basedatatypes import BaseFigure
 
 from analysis_utils import *
 
 pio.templates.default = 'plotly_white'
 
 
-def generate_html_report(template_file: str, output_file: str, gpu_data) -> None:
+def create_report(template_file: str, output_file: str, gpu_data: pd.DataFrame) -> None:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     start_time = gpu_data['timestamp'].min().strftime('%Y-%m-%d %H:%M:%S')
     end_time = gpu_data['timestamp'].max().strftime('%Y-%m-%d %H:%M:%S')
@@ -17,6 +18,7 @@ def generate_html_report(template_file: str, output_file: str, gpu_data) -> None
     template_loader = jinja2.FileSystemLoader(searchpath='./')
     template_env = jinja2.Environment(loader=template_loader)
     template_env.filters['slug'] = slugify
+    template_env.filters['plot'] = fig_to_html
 
     template = template_env.get_template(template_file)
 
@@ -45,6 +47,10 @@ def slugify(value: str) -> str:
     return re.sub(r'[-\s]+', '-', value)
 
 
+def fig_to_html(figure: BaseFigure) -> str:
+    return figure.to_html(include_plotlyjs=False, full_html=False)
+
+
 def main():
     # Parse command-line arguments
     # parser = argparse.ArgumentParser(description='Analyze GPU data and generate an HTML report.')
@@ -66,7 +72,7 @@ def main():
     gpu_data = parse_gpu_data(input_file)
 
     print('Generating HTML report...')
-    generate_html_report(template_file, output_file, gpu_data)
+    create_report(template_file, output_file, gpu_data)
 
     print('Analysis complete!')
     print(f'Report has been generated at: {output_file}')
