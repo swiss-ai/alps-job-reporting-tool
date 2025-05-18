@@ -48,9 +48,18 @@ SAMPLES=$((DURATION * 1000 / INTERVAL))
 
 # Start monitoring
 # echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
+# dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
+#     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
+# done > "${GPU_OUTPUT_FILE}"
+
+# dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
+#     echo "$(date +%s), ${line}"
+# done > "${GPU_OUTPUT_FILE}"
+
 dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
-    echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ) ${line}"
 done > "${GPU_OUTPUT_FILE}"
+
 
 # Start CPU monitoring and filter for summary lines
 # echo "Starting CPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."

@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+import argparse
 
 import jinja2
 import plotly.io as pio
@@ -53,28 +54,31 @@ def fig_to_html(figure: BaseFigure) -> str:
 
 def main():
     # Parse command-line arguments
-    # parser = argparse.ArgumentParser(description='Analyze GPU data and generate an HTML report.')
-    # parser.add_argument('--input_file', type=str, help='Path to the input Parquet file.')
-    # parser.add_argument('--output_file', type=str, default='gpu_report.html', help='Path to the output HTML report file.')
-    # parser.add_argument('--template_file', type=str, help='Path to the Jinja2 template file.')
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Analyze GPU data and generate an HTML report.')
+    parser.add_argument('--input_file', type=str, help='Path to the input Parquet file containing the GPU data.')
+    parser.add_argument('--input_file2', type=str, help='Path to the input Parquet file containing all other data.')
+    parser.add_argument('--output_file', type=str, default='gpu_report.html', help='Path to the output HTML report file.')
+    parser.add_argument('--template_file', type=str, help='Path to the Jinja2 template file.')
+    args = parser.parse_args()
 
-    # input_file = args.input_file
-    # output_file = args.output_file
-    # template_file = args.template_file
+    input_file = args.input_file
+    input_file2 = args.input_file2
+    output_file = args.output_file
+    template_file = args.template_file
 
-    input_file = '../outputs/434267_12-05-2025/data_434267_12-05-2025.parquet'
-    output_file = '../outputs/434267_12-05-2025/434267_new_report.html'
+    # input_file = './outputs/447423_18-05-2025/data_447423_18-05-2025_gpu.parquet'
+    # input_file2 = './outputs/447423_18-05-2025/data_447423_18-05-2025.parquet'
+    # output_file = './outputs/447423_18-05-2025/447423_new_report.html'
+    # template_file = './lib/new_template.html'
 
-    template_file = './new_template.html'
-
-    print('Parsing GPU data...')
+    print('Parsing data...')
     gpu_data = parse_gpu_data(input_file)
+    other_data = parse_other_data(input_file2)
+
 
     print('Generating HTML report...')
     create_report(template_file, output_file, gpu_data)
 
-    print('Analysis complete!')
     print(f'Report has been generated at: {output_file}')
 
 

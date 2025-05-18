@@ -16,6 +16,17 @@ def parse_gpu_data(input_file: str) -> pd.DataFrame:
 
     return df
 
+def parse_other_data(input_file: str) -> pd.DataFrame:
+    df = pd.read_parquet(input_file)
+    df.reset_index(inplace=True)
+
+    # Convert column names to lowercase
+    df.columns = df.columns.str.lower()
+
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+
+    return df
 
 # Visualization functions
 def plot_summary_series(df, y_col, title, y_label, include_std=False) -> go.Figure:

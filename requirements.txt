@@ -3,3 +3,5 @@ numpy
 pyarrow
 jinja2
 plotly
+matplotlib
+seaborn
