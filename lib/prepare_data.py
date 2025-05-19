@@ -525,6 +525,9 @@ def main():
     combined_df = pd.merge(combined_df, io_df, on=['timestamp', 'node_id'], how='outer')
     combined_df = pd.merge(combined_df, net_df, on=['timestamp', 'node_id'], how='outer')
 
+    # Reset the index after merging
+    combined_df = combined_df.reset_index(drop=True)
+
     # Print the first few rows of the combined DataFrame
     #print(combined_df.columns)
     #print(combined_df.head(5))
@@ -532,7 +535,7 @@ def main():
     # Print amount of rows with at least one NaN value
     print(f"Number of rows with at least one NaN value: {combined_df.isnull().any(axis=1).sum()}")
     # Print the indices of those rows
-    print(f"Indices of rows with at least one NaN value: {combined_df[combined_df.isnull().any(axis=1)].index.tolist()}")
+    #print(f"Indices of rows with at least one NaN value: {combined_df[combined_df.isnull().any(axis=1)].index.tolist()}")
 
     #print first 5 values of the node_id column for each DataFrame
     # print(gpu_df.head(5))

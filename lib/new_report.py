@@ -63,12 +63,18 @@ def main():
 
     input_file = args.input_file
     input_file2 = args.input_file2
-    output_file = args.output_file
     template_file = args.template_file
 
-    # input_file = './outputs/447423_18-05-2025/data_447423_18-05-2025_gpu.parquet'
-    # input_file2 = './outputs/447423_18-05-2025/data_447423_18-05-2025.parquet'
-    # output_file = './outputs/447423_18-05-2025/447423_new_report.html'
+    # Add the timestamp to the output file name
+    output_file = args.output_file
+    if not output_file.endswith('.html'):
+        output_file += f'_{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.html'
+    else:
+        output_file = output_file.replace('.html', f'_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.html')
+
+    # input_file = './outputs/448821_19-05-2025/data_448821_19-05-2025_gpu.parquet'
+    # input_file2 = './outputs/448821_19-05-2025/data_448821_19-05-2025.parquet'
+    # output_file = f'./outputs/448821_19-05-2025/report_448821_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.html'
     # template_file = './lib/new_template.html'
 
     print('Parsing data...')
@@ -78,8 +84,6 @@ def main():
 
     print('Generating HTML report...')
     create_report(template_file, output_file, gpu_data)
-
-    print(f'Report has been generated at: {output_file}')
 
 
 if __name__ == '__main__':
