@@ -63,7 +63,7 @@ while [[ $counter -lt $DURATION ]]; do
 
     counter=$((counter + 1))
   fi
-  sleep 1
+  sleep 0.1
 done
 
 #echo "Network metrics logging complete. Output saved to ${NET_OUTPUT_FILE}"

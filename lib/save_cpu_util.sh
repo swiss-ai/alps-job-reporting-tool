@@ -63,7 +63,7 @@ while [[ $counter -lt $DURATION ]]; do
 
     counter=$((counter + 1))
   fi
-  sleep 1
+  sleep 0.1
 done
 
 #echo "CPU utilization logging complete. Output saved to ${CPU_UTIL_OUTPUT_FILE}"
