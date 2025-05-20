@@ -26,7 +26,7 @@ def parse_gpu_data(input_file: str) -> pd.DataFrame:
     # Take mean over duplicated timestamps for each unique node, gpu id.
     df = df.groupby(['timestamp', 'node_id', 'gpu_id']).mean().reset_index()
     #select columns of interest
-    pivot_df = df.pivot(index='timestamp', columns=['node_id', 'gpu_id'], values=['gract', 'smact', 'tenso', 'tmptr', 'power', 'pcitx', 'pcirx', 'nvltx', 'nvlrx', 'nvl0t', 'nvl0r', 'nvl1t', 'nvl1r', 'nvl2t', 'nvl2r', 'nvl3t', 'nvl3r'])
+    pivot_df = df.pivot(index='timestamp', columns=['node_id', 'gpu_id'], values=['drama','gputl','fbusp','mcutl','mmtmp','gract', 'smact', 'tenso', 'tmptr', 'power', 'pcitx', 'pcirx', 'nvltx', 'nvlrx', 'nvl0t', 'nvl0r', 'nvl1t', 'nvl1r', 'nvl2t', 'nvl2r', 'nvl3t', 'nvl3r'])
     pivot_df.reset_index(inplace=True)
 
     pivot_df.dropna(axis=1, how='all', inplace=True)
@@ -172,6 +172,7 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True,limit:int=5,
         )
 
     fig.update_traces(line={'width': 0.5})
+    fig.update_layout(title=title)
     return fig
 
 
@@ -257,7 +258,7 @@ def get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
         ],
     ]
 
-def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
+def get_overview_statistics(gpu_data: pd.DataFrame, df: pd.DataFrame) -> List[go.Figure]:
     """
     Get the overview statistics from the GPU data.
 
@@ -268,6 +269,7 @@ def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         list: list of plots/tables/comments that need to be displayed
     """
 
+    plots = []
     # Prepare data for overview stats
     node_avg = gpu_data.groupby(['node_id', 'gpu_id']).agg({
         'gract': 'mean',
@@ -295,7 +297,25 @@ def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         color_continuous_scale='Viridis',
     )
 
-    return [power_vs_tenso]
+    metrics = ['GRACT', 'SMACT', 'POWER', 'TMPTR', 'PCITX', 'PCIRX', 'NVLTX', 'NVLRX']
+    # Calculate correlation between metrics
+
+    # Create correlation matrices
+    df_corr = df[metrics].corr().round(2)
+
+    fig = px.imshow(df_corr,
+                    labels=dict(x="Metric correlations", color="Coolwarm"),
+                    x=metrics,
+                    y=metrics,
+                    text_auto=True,
+                    aspect="auto"
+                    )
+
+    fig.update_xaxes(side="top")
+
+    plots.append(power_vs_tenso)
+    plots.append(fig)
+    return plots
 
 def old_get_temp_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     """
@@ -368,33 +388,38 @@ def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
         list: list of plots/tables/comments that need to be displayed
     """
     plots = []
-    temp_timeline = plot_summary_series(
-        pivot_gpu_data,
-        'tmptr',
-        'Mean Temperature Over Time',
-        'Temperature (°C)',
-        include_std=True,
-    )
-    table1 = anomalies_table(pivot_gpu_data, 'tmptr', True, 5)
-    table2 = anomalies_table(pivot_gpu_data, 'tmptr', False, 5)
+    for name, metric in zip(
+            ['Device Temperature', 'Memory Temperature'],
+            ['tmptr','mmtmp']):
+        temp_timeline = plot_summary_series(
+            pivot_gpu_data,
+            y_col = metric,
+            title = name + ' Over Time',
+            y_label = 'Temperature (°C)',
+            include_std=True,
+        )
 
-    pivot_gpu_data = pivot_gpu_data['tmptr'].copy()
-    pivot_gpu_data.columns = ["_".join(a) for a in pivot_gpu_data.columns.to_flat_index()]
+    # table1 = anomalies_table(pivot_gpu_data, 'tmptr', True, 5)
+    # table2 = anomalies_table(pivot_gpu_data, 'tmptr', False, 5)
 
-    mean = pivot_gpu_data.mean(axis=0) #Mean over time for fixed node and gpu
-    mean.sort_values(ascending=True, inplace=True)
+        df = pivot_gpu_data[metric].copy()
+        df.columns = ["-GPU".join(a) for a in df.columns.to_flat_index()]
 
-    # temp distribution
-    temp_distribution = px.histogram(
-        x=mean,
-        labels={'temperature': 'Degrees Celsius', 'count': 'Count'},
-        title='Mean Temperature of GPUs',
-    )
+        mean = df.mean(axis=0) #Mean over time for fixed node and gpu
+        mean = mean.sort_values(ascending=True).rename(name+' mean')
 
-    plots.append(temp_timeline)
-    plots.append(temp_distribution)
-    plots.append(table1)
-    plots.append(table2)
+        # temp distribution
+        temp_distribution = px.histogram(
+            x=mean,
+            labels={'temperature': 'Degrees Celsius', 'count': 'Count'},
+            title=name,
+        )
+
+        plots.append(temp_timeline)
+        plots.append(temp_distribution)
+        # plots.append(table1)
+        # plots.append(table2)
+        plots.append(mean.reset_index().rename(columns={'index': 'node-GPU'}))
 
     return plots
 
@@ -476,19 +501,19 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     plots.append(plot_summary_series(
         pivot_gpu_data,
         'power',
-        'Mean Power Over Time',
+        'Power Usage Over Time',
         'Power (W)',
         include_std=True,
     ))
 
-    table1 = anomalies_table(pivot_gpu_data, 'power', True, 5)
-    table2 = anomalies_table(pivot_gpu_data, 'power', False, 5)
+    # table1 = anomalies_table(pivot_gpu_data, 'power', True, 5)
+    # table2 = anomalies_table(pivot_gpu_data, 'power', False, 5)
 
-    pivot_gpu_data = pivot_gpu_data['tmptr'].copy()
-    pivot_gpu_data.columns = ["_".join(a) for a in pivot_gpu_data.columns.to_flat_index()]
+    pivot_gpu_data = pivot_gpu_data['power'].copy()
+    pivot_gpu_data.columns = ["-GPU".join(a) for a in pivot_gpu_data.columns.to_flat_index()]
 
     mean = pivot_gpu_data.mean(axis=0) #Mean over time for fixed node and gpu
-    mean.sort_values(ascending=True, inplace=True)
+    mean = mean.sort_values(ascending=True).rename('mean')
 
     # power distribution
     power_distribution = px.histogram(
@@ -498,8 +523,9 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     )
 
     plots.append(power_distribution)
-    plots.append(table1)
-    plots.append(table2)
+    # plots.append(table1)
+    # plots.append(table2)
+    plots.append(mean.reset_index().rename(columns={'index': 'node-GPU'}))
 
     return plots
 
@@ -549,6 +575,73 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     activity_timeline.update_yaxes(title_text='Tensor Core Usage', secondary_y=False)
     activity_timeline.update_yaxes(title_text='Graphic Activity', secondary_y=True)
     plots.append(activity_timeline)
+
+    return plots
+
+def get_utilisation_statistics(pivot_gpu_data: pd.DataFrame, limit:int=5) -> List[go.Figure]:
+    """
+    Get the utilisation statistics from the GPU data.
+
+    Args:
+        gpu_data (dict): The GPU data, raw data.
+
+    Returns:
+        list: list of plots/tables/comments that need to be displayed
+    """
+    plots = ['Least utilised gpus selected']
+    for name, metric in zip(
+            ['Device Memory Interface Utilisation', 'GPU Utilisation', 'Frame Buffer Memory Utilisation',
+             'Memory Controller Utilisation', 'Graphics Engine Utilisation', 'Memory utilization', 'SM utilization'],
+            ['drama', 'gputl', 'fbusp', 'mcutl', 'gract', 'smact', 'tenso']):
+        activity_timeline = make_subplots()
+        df = pivot_gpu_data[metric].copy()
+        # flatten_multilevel column
+        df.columns = ["_".join(a) for a in df.columns.to_flat_index()]
+        diff = (df - 1).sum()
+        #look for lowest utilised
+        diff.sort_values(ascending=True, inplace=True)
+        for x in diff.index[:limit]:
+            activity_timeline.add_trace(
+                go.Scatter(
+                    x=df.index,
+                    y=signal.savgol_filter(df[x].dropna(),#drop na otherwise the filter fails,
+                                   20,  # window size used for filtering
+                                   1),  # order of fitted polynomial,
+                    name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}",
+                ),
+            )
+        activity_timeline.update_layout(title=name)
+        activity_timeline.update_xaxes(title_text='Time')
+        activity_timeline.update_yaxes(title_text='Utilisation')
+        plots.append(activity_timeline)
+
+    return plots
+
+def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame,limit:int=5):
+    # NVLink error metrics
+    plots = ['Highest error counts selected']
+    for name, metric_pair in zip(['NVL0T/R', 'NVL1T/R', 'NVL2T/R','NVL3T/R'], [('nvl0t', 'nvl0r'), ('nvl1t', 'nvl1r'),
+                                    ('nvl2t', 'nvl2r'), ('nvl3t', 'nvl3r')]):
+        tx_metric = metric_pair[0]
+        rx_metric = metric_pair[1]
+        nodes = pivot_gpu_data[[tx_metric,rx_metric]].T.groupby(level=(1,2)).sum().sum(1).sort_values(ascending=False).iloc[:limit].index
+
+        activity_timeline = make_subplots()
+        for node in nodes:
+            for metric in metric_pair:
+                activity_timeline.add_trace(
+                    go.Scatter(
+                        x=pivot_gpu_data.index,
+                        y=signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(),  # drop na otherwise the filter fails,
+                                               100,  # window size used for filtering
+                                               1),  # order of fitted polynomial,
+                        name=f"{node[0]}-GPU{node[1]}",
+                    ),
+                )
+        activity_timeline.update_layout(title=name)
+        activity_timeline.update_xaxes(title_text='Time')
+        activity_timeline.update_yaxes(title_text='Error count')
+        plots.append(activity_timeline)
 
     return plots
 
