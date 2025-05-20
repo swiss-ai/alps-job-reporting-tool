@@ -482,7 +482,7 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     ))
 
     table1 = anomalies_table(pivot_gpu_data, 'power', True, 5)
-    table2 = anomalies_table(pivot_gpu_data, 'power', True, 5)
+    table2 = anomalies_table(pivot_gpu_data, 'power', False, 5)
 
     pivot_gpu_data = pivot_gpu_data['tmptr'].copy()
     pivot_gpu_data.columns = ["_".join(a) for a in pivot_gpu_data.columns.to_flat_index()]
