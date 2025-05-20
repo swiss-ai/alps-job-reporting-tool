@@ -12,7 +12,8 @@ from analysis_utils import *
 pio.templates.default = 'plotly_white'
 
 
-def create_report(template_file: str, output_file: str, gpu_data: pd.DataFrame, pivot_gpu_data: pd.DataFrame) -> None:
+def create_report(template_file: str, output_file: str, input_file:str) -> None:
+    gpu_data, pivot_gpu_data = parse_gpu_data(input_file)
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     start_time = gpu_data['timestamp'].min().strftime('%Y-%m-%d %H:%M:%S')
     end_time = gpu_data['timestamp'].max().strftime('%Y-%m-%d %H:%M:%S')
@@ -70,11 +71,11 @@ def main():
     if not output_file.endswith('.html'):
         output_file += f'_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.html'
 
-    gpu_data,pivot_gpu_data = parse_gpu_data(input_file)
+
     other_data = parse_other_data(input_file2)
 
     print('Generating HTML report...')
-    create_report('new_template.html', output_file, gpu_data, pivot_gpu_data)
+    create_report('new_template.html', output_file, input_file)
 
 
 if __name__ == '__main__':
