@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from scipy import signal
 
 
 # Data manipulation functions
@@ -13,6 +14,7 @@ def parse_gpu_data(input_file: str) -> pd.DataFrame:
 
     # Convert column names to lowercase
     df.columns = df.columns.str.lower()
+    df['time'] = df['timestamp'].dt.round('s')
 
     return df
 
@@ -357,6 +359,16 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
             y=time_avg['tenso'],
             name='Tensor Core Activity',
         ),
+        secondary_y=True,
+    )
+    activity_timeline.add_trace(
+        go.Scatter(
+        x=time_avg['time'],
+        y=signal.savgol_filter(time_avg['tenso'],
+                               5,  # window size used for filtering
+                               2),  # order of fitted polynomial
+        name='Smoothed Tensor Core Activity',
+    ),
         secondary_y=True,
     )
     activity_timeline.update_layout(title='GPU Activity Over Time')
