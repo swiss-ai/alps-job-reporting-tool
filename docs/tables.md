@@ -40,7 +40,7 @@ This document provides an explanation of the columns in the GPU data table and t
 | `TMP01`          | 858               | NVSwitch current temperature. |
 | `SWTX`           | 861               | NVSwitch transmitted throughput in bytes/second. |
 | `SWRX`           | 862               | NVSwitch received throughput in bytes/second. |
-| `GRACT`          | 1001              | GPU utilization as a percentage. |
+| `GRACT`          | 1001              | Ratio of time the graphics engine is active |
 | `SMACT`          | 1002              | Memory utilization as the ratio of cycles an SM has at least one warp assigned. |
 | `SMOCC`          | 1003              | Ratio of number of warps resident on an SM. |
 | `TENSO`          | 1004              | SM utilization as the ratio of cycles any tensor pipe is active. |
