@@ -36,7 +36,7 @@ Follow these steps to set up the tool:
 
 ## Usage
 
-### Collecting Data and Create a Report
+### Collecting Data and Creating a Report
 To collect and process data for a given SLURM job, follow these steps:
 
 1. Ensure the SLURM job is running.
@@ -49,10 +49,10 @@ To collect and process data for a given SLURM job, follow these steps:
 
     - `<job_id>`: The SLURM job ID for which data will be collected.
     - `[duration]` (optional): The logging period in seconds for node data collection. The default is 300 seconds.
-3. The collected data and an html report will be saved in the `outputs/<job_id>_<date>` folder.
+3. The collected data and an HTML report will be saved in the `outputs/<job_id>_<date>` folder.
 
 ### Comments
 
 Both CSV and Parquet files are saved, allowing users to perform additional analysis and visualize the data using their preferred tools.
 
-If there are any interesting metrics or visualization that you think could be useful let us know such that we can add them.
+If there are any interesting metrics or visualization that you think could be useful, let us know such that we can add them.

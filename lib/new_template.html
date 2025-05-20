@@ -171,7 +171,7 @@
         .table-responsive {
             overflow-x: auto;
             padding: 0.5rem;
-            margin: -0.5rem;
+            margin: -0.5rem -0.5rem 1rem;
             max-height: 500px;
         }
 
@@ -267,7 +267,11 @@
                 <h2>{{ name }}</h2>
 
                 {% for figure in content %}
-                    {% if figure.columns is defined %}
+                    {% if figure is string %}
+                        <div class="summary-box">
+                            <p>{{ figure }}</p>
+                        </div>
+                    {% elif figure.columns is defined %}
                         <div class="table-responsive">
                             <table>
                                 <thead>

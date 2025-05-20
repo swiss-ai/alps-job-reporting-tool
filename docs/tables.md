@@ -8,7 +8,7 @@ The goal of this documentation is to help users and developers understand the me
 
 **Key Features of the Tables**:
 - **GPU Table**: Captures detailed telemetry data from NVIDIA GPUs using the Data Center GPU Manager (DCGM) API, including metrics such as temperature, power usage, memory utilization, and NVLink throughput.
-- **General Table: Captures other data as for example CPU temperature, usage statistics, network, I/O. 
+- **General Table**: Captures other data as for example, CPU temperature, usage statistics, network, I/O. 
 
 Each table is structured to provide a timestamped snapshot of the system's state, enabling users to analyze trends, identify bottlenecks, and optimize resource usage.
 

@@ -128,12 +128,13 @@ def find_series_outliers(df: pd.DataFrame, y_col: str, n_std=3) -> pd.DataFrame:
         .sort_values('count', ascending=False)
 
 
-def get_key_statistics(gpu_data: pd.DataFrame):
+def get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
     """
     Get the key statistics from the GPU data.
 
     Args:
         gpu_data (dict): The GPU data.
+        anomalies (int): The number of anomalies detected.
 
     Returns:
         list: [title, value, type] for each key statistic.
@@ -152,7 +153,7 @@ def get_key_statistics(gpu_data: pd.DataFrame):
             'primary'
         ], [
             'Anomalies detected',
-            'TO-DO',
+            anomalies,
             'warning'
         ], [
             'Reporting Duration (min)',
@@ -170,8 +171,6 @@ def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         gpu_data (dict): The GPU data, raw data.
 
     Returns:
-        id: string for the html href
-        title: string for the title of the statistic
         list: list of plots/tables/comments that need to be displayed
     """
 
@@ -213,8 +212,6 @@ def get_temp_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         gpu_data (dict): The GPU data, raw data.
 
     Returns:
-        id: string for the html href
-        title: string for the title of the statistic
         list: list of plots/tables/comments that need to be displayed
     """
 
@@ -276,8 +273,6 @@ def get_power_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         gpu_data (dict): The GPU data, raw data.
 
     Returns:
-        id: string for the html href
-        title: string for the title of the statistic
         list: list of plots/tables/comments that need to be displayed
     """
 
@@ -341,8 +336,6 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         gpu_data (dict): The GPU data, raw data.
 
     Returns:
-        id: string for the html href
-        title: string for the title of the statistic
         list: list of plots/tables/comments that need to be displayed
     """
     time_data = gpu_data.groupby('time')[['gract', 'smact', 'tenso', 'tmptr', 'power']]
@@ -375,7 +368,7 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     return plots
 
 
-def get_anomalies_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
+def find_anomalies(gpu_data: pd.DataFrame) -> pd.DataFrame:
     """
     Get the anomaly statistics from the GPU data.
 
@@ -383,9 +376,7 @@ def get_anomalies_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
         gpu_data (dict): The GPU data, raw data.
 
     Returns:
-        id: string for the html href
-        title: string for the title of the statistic
-        list: list of plots/tables/comments that need to be displayed
+        pd.DataFrame: DataFrame containing the anomalies.
     """
 
     # Power efficiency (tensor operations per watt)
@@ -419,9 +410,7 @@ def get_anomalies_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     # Merge with the node_avg dataframe
     anomalies = pd.merge(anomalies, node_avg, on=['node_id', 'gpu_id'], how='left')
     # Group by Node and GPU, concat the 'anomaly' fields
-    anomalies = anomalies.groupby(['node_id', 'gpu_id']).agg({
+    return anomalies.groupby(['node_id', 'gpu_id']).agg({
         'count': 'sum',
         'anomaly': lambda x: ', '.join(x)
     }).sort_values('count', ascending=False).reset_index()
-
-    return [anomalies]
