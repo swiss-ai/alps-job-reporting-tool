@@ -12,7 +12,7 @@ from analysis_utils import *
 pio.templates.default = 'plotly_white'
 
 
-def create_report(template_file: str, output_file: str, gpu_data: pd.DataFrame) -> None:
+def create_report(template_file: str, output_file: str, gpu_data: pd.DataFrame, pivot_gpu_data: pd.DataFrame) -> None:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     start_time = gpu_data['timestamp'].min().strftime('%Y-%m-%d %H:%M:%S')
     end_time = gpu_data['timestamp'].max().strftime('%Y-%m-%d %H:%M:%S')
@@ -32,8 +32,8 @@ def create_report(template_file: str, output_file: str, gpu_data: pd.DataFrame) 
         'key_statistics': get_key_statistics(gpu_data, anomalies['count'].sum()),
         'tabs': {
             'Overview': get_overview_statistics(gpu_data),
-            'Temperature Analysis': get_temp_statistics(gpu_data),
-            'Power Analysis': get_power_statistics(gpu_data),
+            'Temperature Analysis': get_temp_statistics(pivot_gpu_data),
+            'Power Analysis': get_power_statistics(pivot_gpu_data),
             'GPUs Activity': get_activity_statistics(gpu_data),
             'Anomalies': [anomalies, 'Hello World!'],
         },
@@ -70,11 +70,11 @@ def main():
     if not output_file.endswith('.html'):
         output_file += f'_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.html'
 
-    gpu_data = parse_gpu_data(input_file)
+    gpu_data,pivot_gpu_data = parse_gpu_data(input_file)
     other_data = parse_other_data(input_file2)
 
     print('Generating HTML report...')
-    create_report('new_template.html', output_file, gpu_data)
+    create_report('new_template.html', output_file, gpu_data, pivot_gpu_data)
 
 
 if __name__ == '__main__':
