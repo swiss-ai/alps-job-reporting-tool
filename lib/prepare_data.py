@@ -500,8 +500,6 @@ def process_net_logs(directory, limit=None):
     diff_columns = pivot_df.columns.difference(['timestamp', 'node_id'])  # Exclude index columns
     pivot_df[diff_columns] = pivot_df.groupby('node_id')[diff_columns].diff()
 
-    print(pivot_df.head(10))
-
     return pivot_df
 
 def main():
