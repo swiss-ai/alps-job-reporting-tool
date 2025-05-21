@@ -32,6 +32,8 @@ def create_report(template_file: str, output_file: str, input_file:str, input_fi
 
     template = template_env.get_template(template_file)
 
+    cpu_stats = get_cpu_statistics(other_data)
+
     html_content = template.render(**{
         'current_date': now,
         'start_time': start_time,
@@ -44,6 +46,9 @@ def create_report(template_file: str, output_file: str, input_file:str, input_fi
             'GPUs Activity': get_activity_statistics(gpu_data),
             'Utilisation':get_utilisation_statistics(pivot_gpu_data),
             'NVLink Errors': get_nvlink_statistics(pivot_gpu_data),
+            'CPU Current Analysis': cpu_stats[0],
+            'CPU Power Analysis': cpu_stats[1],
+            'CPU Temperature Analysis': cpu_stats[2],
             'Net Activity': get_net_statistics(other_data),
             'Anomalies': [anomalies, 'Hello World!'],
         },

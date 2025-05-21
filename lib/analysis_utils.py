@@ -103,7 +103,7 @@ def old_plot_summary_series(df, y_col, title, y_label, include_std=False) -> go.
 
     return fig
 
-def plot_summary_series(df, y_col, title, y_label, include_std=True,limit:int=5,smoothing_size:int=10, table=True) -> go.Figure:
+def plot_summary_series(df, y_col, title, y_label, include_std=True,limit:int=5,smoothing_size:int=10, table=True, gpu=True) -> go.Figure:
     """
     Plot a time series graph with mean and optional standard deviation.
     Args:
@@ -120,7 +120,8 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True,limit:int=5,
 
     #flatten_multilevel column
     df = df[y_col].copy()
-    df.columns = ["_".join(a) for a in df.columns.to_flat_index()]
+    if gpu:
+        df.columns = ["_".join(a) for a in df.columns.to_flat_index()]
 
     mean = df.mean(axis=0) #Mean over time for fixed node and gpu
     df['mean'] = df.mean(axis=1) #Mean over nodes or gpu at fixed time
@@ -163,7 +164,7 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True,limit:int=5,
                     mode='lines',
                     line={'width': 0.5},
                     showlegend=True,
-                    name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}",
+                    name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}" if gpu else x,
                 )
             )
 
@@ -415,7 +416,7 @@ def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
         # temp distribution
         temp_distribution = px.histogram(
             x=mean,
-            labels={'temperature': 'Degrees Celsius', 'count': 'Count'},
+            labels={'x': 'Degrees Celsius', 'count': 'Count'},
             title=name,
         )
 
@@ -522,7 +523,7 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     # power distribution
     power_distribution = px.histogram(
         x=mean,
-        labels={'temperature': 'Degrees Celsius', 'count': 'Count'},
+        labels={'x': 'Watts', 'count': 'Count'},
         title='Mean Temperature of GPUs',
     )
 
@@ -884,3 +885,50 @@ def get_net_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
     plots.append(tx_bytes_fig)
 
     return plots
+
+def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[go.Figure]]:
+    """
+    Get the temperature, current, power statistics from the CPU data.
+
+    Args:
+        other_data (dict): The CPU data, raw data.
+
+    Returns:
+        list: list of plots/tables/comments that need to be displayed
+    """
+    metrics = ['curr','power','temp']
+    stats = ['max','mean','min']
+    unit_labels = {'curr': 'Current (A)', 'power': 'Power (W)', 'temp': 'Temperature (°C)'}
+    metric_plots=[] #will have 3 plots for curr,power, and temp
+    for metric in metrics:
+        cols = [metric+'_'+stat for stat in stats]
+        df = other_data.pivot(index='timestamp', columns=['node_id'], values=cols)
+        plots = ['Plot shows the 2 standard deviation interval and the 5 cpus with the lowest and highest mean measurements over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 1s']
+        for name, col in zip(
+                [stat.title() for stat in stats],
+                cols):
+            timeline = plot_summary_series(
+                df,
+                y_col = col,
+                title = name +' '+ metric.title()+' Over Time',
+                y_label = unit_labels[metric],
+                include_std=True,
+                gpu=False
+            )
+
+            mean = df.mean(axis=0) #Mean over time for fixed node and gpu
+            mean = mean.sort_values(ascending=True).rename('Mean of '+name.title()+' '+unit_labels[metric])
+
+            #istribution
+            distribution = px.histogram(
+                x=mean,
+                labels={'x': unit_labels[metric], 'count': 'Count'},
+                title=name,
+            )
+
+            plots.append(timeline)
+            plots.append(distribution)
+            plots.append(mean.reset_index().drop('level_0',axis=1))
+        metric_plots.append(plots)
+
+    return metric_plots
