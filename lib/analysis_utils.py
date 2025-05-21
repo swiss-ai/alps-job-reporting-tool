@@ -43,6 +43,10 @@ def parse_other_data(input_file: str) -> pd.DataFrame:
     # Convert column names to lowercase
     df.columns = df.columns.str.lower()
 
+    # Remove spaces from column names
+    df.columns = df.columns.str.replace(' ', '')
+
+
     # Convert timestamp to datetime
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
 
@@ -720,3 +724,137 @@ def anomalies_table(pivot_gpu_data: pd.DataFrame, metric:str, asc = True, limit:
         )
     )
     return fig
+
+def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, column: str) -> go.Figure:
+    """
+    Analyzes outliers for a given column based on mean ± 2*std and generates a Plotly figure.
+
+    Parameters:
+        mean_std_df (pd.DataFrame): DataFrame containing mean and std for each timestamp.
+        new_net_df (pd.DataFrame): Original DataFrame with node-level data.
+        column (str): The column to analyze (e.g., 'rx_bytes').
+
+    Returns:
+        go.Figure: A Plotly figure visualizing the outliers.
+    """
+    # Merge the mean and std values with the original DataFrame
+    specific_df = pd.merge(
+        new_net_df[['timestamp', 'node_id', column]],
+        mean_std_df[['timestamp', f'{column}_mean', f'{column}_std']],
+        on='timestamp'
+    )
+
+    # Identify outliers (values greater than mean + 2*std)
+    specific_df = specific_df[
+        specific_df[column] > (specific_df[f'{column}_mean'] + 2 * specific_df[f'{column}_std'])
+    ]
+
+    # Group by node_id and count the number of outliers
+    outliers = specific_df.groupby('node_id').size().reset_index(name='outliers')
+
+    # Filter nodes with outliers greater than 10% of the total timestamps
+    duration = (new_net_df['timestamp'].max() - new_net_df['timestamp'].min()).total_seconds()
+    outliers = outliers[outliers['outliers'] > (0.2 * duration)]
+    outliers_node = outliers['node_id'].tolist()
+
+    # Create a Plotly figure for the outliers
+    fig = go.Figure()
+
+    # Add traces for each outlier node
+    for node in outliers_node:
+        node_df = specific_df[specific_df['node_id'] == node]
+        fig.add_trace(
+            go.Scatter(
+                x=node_df['timestamp'],
+                y=node_df[column],
+                mode='lines',
+                name=f'Node {node}'
+            )
+        )
+
+    # Add the mean ± 2*std range as a shaded area
+    fig.add_trace(
+        go.Scatter(
+            x=specific_df['timestamp'],
+            y=specific_df[f'{column}_mean'] + 2 * specific_df[f'{column}_std'],
+            mode='lines',
+            line=dict(width=0),
+            showlegend=False,
+            name='Mean + 2*Std',
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=specific_df['timestamp'],
+            y=specific_df[f'{column}_mean'] - 2 * specific_df[f'{column}_std'],
+            mode='lines',
+            fill='tonexty',
+            fillcolor='rgba(128, 128, 128, 0.2)',
+            line=dict(width=0),
+            showlegend=False,
+            name='Mean - 2*Std',
+        )
+    )
+
+    # Update layout
+    fig.update_layout(
+        title=f"{column.replace('_', ' ').title()} Outliers",
+        xaxis_title="Timestamp",
+        yaxis_title=column.replace('_', ' ').title(),
+        legend_title="Nodes",
+    )
+
+    return fig, outliers_node
+
+def get_net_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
+    """
+    Get the network statistics from the GPU data.
+
+    Args:
+        gpu_data (dict): The GPU data, raw data.
+
+    Returns:
+        list: list of plots/tables/comments that need to be displayed
+    """
+    plots = []
+    # prepare net_df
+    net_columns = ['timestamp', 'node_id', 'hsn0_rx_bytes', 'hsn1_rx_bytes', 'hsn2_rx_bytes', 'hsn3_rx_bytes', 'nmn0_rx_bytes',
+        'hsn0_rx_errors', 'hsn1_rx_errors', 'hsn2_rx_errors', 'hsn3_rx_errors',
+        'nmn0_rx_errors', 'hsn0_rx_packets', 'hsn1_rx_packets',
+        'hsn2_rx_packets', 'hsn3_rx_packets', 'nmn0_rx_packets',
+        'hsn0_tx_bytes', 'hsn1_tx_bytes', 'hsn2_tx_bytes', 'hsn3_tx_bytes',
+        'nmn0_tx_bytes', 'hsn0_tx_errors', 'hsn1_tx_errors', 'hsn2_tx_errors',
+        'hsn3_tx_errors', 'nmn0_tx_errors', 'hsn0_tx_packets',
+        'hsn1_tx_packets', 'hsn2_tx_packets', 'hsn3_tx_packets',
+        'nmn0_tx_packets']
+    net_df = other_data[net_columns]
+
+    # prepare the 2 dataframes needed for the analysis
+    new_columns = ['timestamp', 'node_id', 'rx_bytes', 'rx_errors', 'rx_packets', 'tx_bytes', 'tx_errors', 'tx_packets']
+    # create a new dataframe with the new columns (created with a mean of the old columns)
+    new_net_df = pd.DataFrame(columns=new_columns)
+    # copy the timestamp and node_id columns from the old dataframe
+    new_net_df['timestamp'] = net_df['timestamp']
+    new_net_df['node_id'] = net_df['node_id']
+    # for every column in the new dataframe combine the columns in the old dataframe
+    for column in new_columns[2:]:
+        # get the columns that start with the same prefix
+        cols = [col for col in net_df.columns if col.endswith(column)]
+        # get the mean of the columns
+        new_net_df[column] = net_df[cols].sum(axis=1)
+
+    # create a new dataframe with only mean and std for every column (grouped by timestamp)
+    mean_std_df = new_net_df.drop(columns=['node_id']).groupby("timestamp").agg(['mean', 'std']).reset_index()
+    # Flatten the MultiIndex columns in mean_std_df
+    mean_std_df.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col for col in mean_std_df.columns]
+
+    # call the function to analyze the outliers for rx_bytes
+    rx_bytes_fig, rx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'rx_bytes')
+    tx_bytes_fig, tx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'tx_bytes')
+    print(rx_bytes_outliers)
+    
+    # add to plots
+    plots.append(rx_bytes_fig)
+    plots.append(tx_bytes_fig)
+
+    return plots

@@ -496,6 +496,12 @@ def process_net_logs(directory, limit=None):
     # Sort by timestamp and node_id
     pivot_df = pivot_df.sort_values(by=['timestamp', 'node_id'])
 
+    # Calculate differences for each metric
+    diff_columns = pivot_df.columns.difference(['timestamp', 'node_id'])  # Exclude index columns
+    pivot_df[diff_columns] = pivot_df.groupby('node_id')[diff_columns].diff()
+
+    print(pivot_df.head(10))
+
     return pivot_df
 
 def main():
@@ -505,6 +511,7 @@ def main():
 
     # get the current date in the format DAY-MONTH-YEAR
     current_date = datetime.now().strftime("%d-%m-%Y")
+    current_date = "19-05-2025"
 
     # prepare the paths used in the script
     logs_directory = f"./outputs/{args.job_id}_{current_date}/logs"
@@ -527,6 +534,9 @@ def main():
 
     # Reset the index after merging
     combined_df = combined_df.reset_index(drop=True)
+
+    # strip whitespace from column names
+    combined_df.columns = combined_df.columns.str.strip()
 
     # Print the first few rows of the combined DataFrame
     #print(combined_df.columns)

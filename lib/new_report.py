@@ -12,8 +12,9 @@ from analysis_utils import *
 pio.templates.default = 'plotly_white'
 
 
-def create_report(template_file: str, output_file: str, input_file:str) -> None:
+def create_report(template_file: str, output_file: str, input_file:str, input_file2:str) -> None:
     gpu_data, pivot_gpu_data = parse_gpu_data(input_file)
+    other_data = parse_other_data(input_file2)
 
     df = pd.read_parquet(input_file)
     df.reset_index(inplace=True)
@@ -43,6 +44,7 @@ def create_report(template_file: str, output_file: str, input_file:str) -> None:
             'GPUs Activity': get_activity_statistics(gpu_data),
             'Utilisation':get_utilisation_statistics(pivot_gpu_data),
             'NVLink Errors': get_nvlink_statistics(pivot_gpu_data),
+            'Net Activity': get_net_statistics(other_data),
             'Anomalies': [anomalies, 'Hello World!'],
         },
     })
@@ -78,11 +80,8 @@ def main():
     if not output_file.endswith('.html'):
         output_file += f'_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.html'
 
-
-    other_data = parse_other_data(input_file2)
-
     print('Generating HTML report...')
-    create_report('new_template.html', output_file, input_file)
+    create_report('new_template.html', output_file, input_file, input_file2)
 
 
 if __name__ == '__main__':
