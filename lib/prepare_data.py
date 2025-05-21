@@ -511,7 +511,7 @@ def main():
 
     # get the current date in the format DAY-MONTH-YEAR
     current_date = datetime.now().strftime("%d-%m-%Y")
-    current_date = "19-05-2025"
+    #current_date = "19-05-2025"
 
     # prepare the paths used in the script
     logs_directory = f"./outputs/{args.job_id}_{current_date}/logs"
