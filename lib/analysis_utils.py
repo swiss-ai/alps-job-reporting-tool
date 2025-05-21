@@ -391,7 +391,7 @@ def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots = []
+    plots = ['Plot shows the 2 standard deviation interval and the 5 gpus with the lowest and highest mean temperatures over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms']
     for name, metric in zip(
             ['Device Temperature', 'Memory Temperature'],
             ['tmptr','mmtmp']):
@@ -501,7 +501,7 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     """
 
     # Power usage plots
-    plots = []
+    plots = ['Plot shows the 2 standard deviation interval and the 5 gpus with the lowest and highest mean power usage over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms']
     plots.append(plot_summary_series(
         pivot_gpu_data,
         'power',
@@ -592,11 +592,19 @@ def get_utilisation_statistics(pivot_gpu_data: pd.DataFrame, limit:int=5) -> Lis
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots = ['Least utilised gpus selected']
+    plots = ['Least utilised gpus selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 20 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.']
     for name, metric in zip(
             ['Device Memory Interface Utilisation', 'GPU Utilisation', 'Frame Buffer Memory Utilisation',
              'Memory Controller Utilisation', 'Graphics Engine Utilisation', 'Memory utilization', 'SM utilization'],
             ['drama', 'gputl', 'fbusp', 'mcutl', 'gract', 'smact', 'tenso']):
+        # activity_timeline = plot_summary_series(
+        #     pivot_gpu_data,
+        #     y_col = metric,
+        #     title = name,
+        #     y_label = 'Utilisation Rate',
+        #     include_std=True,
+        #     smoothing_size=20
+        # )
         activity_timeline = make_subplots()
         df = pivot_gpu_data[metric].copy()
         # flatten_multilevel column
@@ -612,6 +620,15 @@ def get_utilisation_statistics(pivot_gpu_data: pd.DataFrame, limit:int=5) -> Lis
                                    20,  # window size used for filtering
                                    1),  # order of fitted polynomial,
                     name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}",
+                    # mode='lines+markers',
+                    mode = 'lines',
+                    opacity=0.5,
+                    marker=dict(
+                        size=5,
+                        line=dict(
+                            width=0.5,
+                        )
+                    )
                 ),
             )
         activity_timeline.update_layout(title=name)
@@ -621,9 +638,9 @@ def get_utilisation_statistics(pivot_gpu_data: pd.DataFrame, limit:int=5) -> Lis
 
     return plots
 
-def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame,limit:int=5):
+def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame,limit:int=3):
     # NVLink error metrics
-    plots = ['Highest error counts selected']
+    plots = ['Highest error counts in sum of both T&R selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 100 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.']
     for name, metric_pair in zip(['NVL0T/R', 'NVL1T/R', 'NVL2T/R','NVL3T/R'], [('nvl0t', 'nvl0r'), ('nvl1t', 'nvl1r'),
                                     ('nvl2t', 'nvl2r'), ('nvl3t', 'nvl3r')]):
         tx_metric = metric_pair[0]
@@ -639,7 +656,16 @@ def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame,limit:int=5):
                         y=signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(),  # drop na otherwise the filter fails,
                                                100,  # window size used for filtering
                                                1),  # order of fitted polynomial,
-                        name=f"{node[0]}-GPU{node[1]}",
+                        name=f"{node[0]}-GPU{node[1]} T" if metric == tx_metric else f"{node[0]}-GPU{node[1]} R",
+                        # mode='lines+markers',
+                        mode = 'lines',
+                        opacity=0.5,
+                        marker=dict(
+                            size=5,
+                            line=dict(
+                                width=0.5,
+                            )
+                        )
                     ),
                 )
         activity_timeline.update_layout(title=name)
