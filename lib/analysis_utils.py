@@ -780,7 +780,7 @@ def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[go.Figure]]:
                 gpu=False
             )
 
-            mean = df.mean(axis=0) #Mean over time for fixed node and gpu
+            mean = df[col].mean(axis=0) #Mean over time for fixed node and gpu
             mean = mean.sort_values(ascending=True).rename('Mean of '+name.title()+' '+unit_labels[metric])
 
             #istribution
@@ -792,7 +792,7 @@ def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[go.Figure]]:
 
             plots.append(timeline)
             plots.append(distribution)
-            plots.append(mean.reset_index().drop('level_0',axis=1))
+            plots.append(mean.reset_index())
         metric_plots.append(plots)
 
     return metric_plots
