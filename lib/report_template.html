@@ -256,6 +256,7 @@
         {% endfor %}
     </div>
 
+    <!-- Top Categories -->
     <div class="tab-container">
         <div class="tab-buttons">
             {% for title in categories.keys() %}
@@ -268,49 +269,48 @@
         <div id="{{ title | slug }}" class="tab-content">
             <h2>{{ title }}</h2>
 
-            {% if content|length > 1 %}
             <div class="tab-buttons">
                 {% for name in content.keys() %}
                 <a href="#{{ name | slug }}" class="tab-button">{{ name }}</a>
                 {% endfor %}
             </div>
-            {% endif %}
 
+            <!-- Nested Tabs -->
             {% for name, subcontent in content.items() %}
             <div id="{{ name | slug }}" class="tab-content">
-                {% if name %}<h3>{{ name }}</h3>{% endif %}
+                <h3>{{ name }}</h3>
 
                 {% for figure in subcontent %}
-                {% if figure is string %}
-                <div class="summary-box">
-                    <p>{{ figure }}</p>
-                </div>
-                {% elif figure.columns is defined %}
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                        <tr>
-                            {% for header in figure.columns %}
-                            <th>{{ header }}</th>
+                    {% if figure is string %}
+                    <div class="summary-box">
+                        <p>{{ figure }}</p>
+                    </div>
+                    {% elif figure.columns is defined %}
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                            <tr>
+                                {% for header in figure.columns %}
+                                <th>{{ header }}</th>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for _, row in figure.iterrows() %}
+                            <tr>
+                                {% for cell in figure.columns %}
+                                <td>{{ row[cell] }}</td>
+                                {% endfor %}
+                            </tr>
                             {% endfor %}
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for _, row in figure.iterrows() %}
-                        <tr>
-                            {% for cell in figure.columns %}
-                            <td>{{ row[cell] }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="plot-parent">
-                    {{ figure | plot | safe }}
-                </div>
-                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="plot-parent">
+                        {{ figure | plot | safe }}
+                    </div>
+                    {% endif %}
                 {% endfor %}
             </div>
             {% endfor %}
@@ -353,7 +353,11 @@
 
         // For nested tab contents, make sure to set the first tab as active for each
         document.querySelectorAll('.tab-content').forEach(function (tabContent) {
-            setActiveTab(tabContent.querySelector('.tab-button'));
+            const firstTabButton = tabContent.querySelector('.tab-button');
+
+            if (firstTabButton) { // Ensure the tab content contains nested tabs
+                setActiveTab(firstTabButton);
+            }
         });
     });
 </script>
