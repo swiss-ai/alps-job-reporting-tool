@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pandas as pd
 import plotly.express as px
@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy import signal
 
+type Renderable = Union[go.Figure, pd.DataFrame, str]
 
 # Data manipulation functions
 def parse_gpu_data(input_file: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -184,7 +185,7 @@ def get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
     ]
 
 
-def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
+def get_overview_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the overview statistics from the GPU data.
 
@@ -225,18 +226,19 @@ def get_overview_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     corr_metrics = ['GRACT', 'SMACT', 'POWER', 'TMPTR', 'PCITX', 'PCIRX', 'NVLTX', 'NVLRX']
     corr_plot = px.imshow(
         gpu_data[map(lambda s: s.lower(), corr_metrics)].corr().round(2),
-        labels=dict(x='Metric Correlations', color='Coolwarm'),
+        labels=dict(color='Coolwarm'),
         x=corr_metrics,
         y=corr_metrics,
         text_auto=True,
         aspect='auto',
     )
     corr_plot.update_xaxes(side='top')
+    corr_plot.update_layout(title='Metrics Correlation Matrix',)
 
     return [power_vs_tenso_plot, corr_plot]
 
 
-def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
+def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the temperature statistics from the GPU data.
 
@@ -283,7 +285,7 @@ def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     return plots
 
 
-def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
+def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the power statistics from the GPU data.
 
@@ -328,7 +330,7 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[go.Figure]:
     return plots
 
 
-def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
+def get_activity_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the activity statistics from the GPU data.
 
@@ -376,89 +378,98 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[go.Figure]:
     return [activity_timeline]
 
 
-def get_utilisation_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> List[go.Figure]:
+def get_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> List[Renderable]:
     """
-    Get the utilisation statistics from the GPU data.
-
+    Get the utilization statistics from the GPU data.
     Args:
-        gpu_data (dict): The GPU data, raw data.
-
+        pivot_gpu_data (pd.DataFrame): The GPU data, pivoted DataFrame.
+        limit (int): The number of least used GPUs to display.
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
     plots = ['Least utilised gpus selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 20 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.']
-    for name, metric in zip(
-            ['Device Memory Interface Utilisation', 'GPU Utilisation', 'Frame Buffer Memory Utilisation',
-             'Memory Controller Utilisation', 'Graphics Engine Utilisation', 'Memory utilization', 'SM utilization'],
-            ['drama', 'gputl', 'fbusp', 'mcutl', 'gract', 'smact', 'tenso']):
-        activity_timeline = make_subplots()
-        df = pivot_gpu_data[metric].copy()
-        # flatten_multilevel column
-        df.columns = ["_".join(a) for a in df.columns.to_flat_index()]
-        diff = (df - 1).sum()
-        #look for lowest utilised
-        diff.sort_values(ascending=True, inplace=True)
-        for x in diff.index[:limit]:
-            activity_timeline.add_trace(
+    metrics = {
+        'drama': 'Device Memory Interface Utilization',
+        'gputl': 'GPU Utilization',
+        'mcutl': 'Memory Controller Utilization',
+        'gract': 'Graphics Engine Utilization',
+        'smact': 'SM Utilization',
+        'tenso': 'Memory Utilization'
+    }
+
+    for metric, name in metrics.items():
+        nodes = (pivot_gpu_data[metric] - 1).sum().sort_values(ascending=True).index[:limit]
+
+        plot = make_subplots()
+
+        for node in nodes:
+            smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), 20, 1)
+
+            plot.add_trace(
                 go.Scatter(
-                    x=df.index,
-                    y=signal.savgol_filter(df[x].dropna(),#drop na otherwise the filter fails,
-                                   20,  # window size used for filtering
-                                   1),  # order of fitted polynomial,
-                    name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}",
-                    # mode='lines+markers',
+                    x=pivot_gpu_data.index,
+                    y=smoothed,
+                    name=f"{node[0]}-GPU{node[1]}",
                     mode='lines',
                     opacity=0.5,
                     marker=dict(
                         size=5,
-                        line=dict(
-                            width=0.5,
-                        )
+                        line=dict(width=0.5)
                     )
                 ),
             )
-        activity_timeline.update_layout(title=name)
-        activity_timeline.update_xaxes(title_text='Time')
-        activity_timeline.update_yaxes(title_text='Utilisation')
-        plots.append(activity_timeline)
+
+        plot.update_layout(title=name)
+        plot.update_xaxes(title_text='Time')
+        plot.update_yaxes(title_text='Utilization')
+        plots.append(plot)
 
     return plots
 
 
-def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3):
-    # NVLink error metrics
-    plots = ['Highest error counts in sum of both T&R selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 100 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.']
-    for name, metric_pair in zip(['NVL0T/R', 'NVL1T/R', 'NVL2T/R','NVL3T/R'], [('nvl0t', 'nvl0r'), ('nvl1t', 'nvl1r'),
-                                    ('nvl2t', 'nvl2r'), ('nvl3t', 'nvl3r')]):
-        tx_metric = metric_pair[0]
-        rx_metric = metric_pair[1]
-        nodes = pivot_gpu_data[[tx_metric,rx_metric]].T.groupby(level=(1,2)).sum().sum(1).sort_values(ascending=False).iloc[:limit].index
+def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[Renderable]:
+    """
+    Get the NVLink statistics from the GPU data.
+    Args:
+        pivot_gpu_data (pd.DataFrame): The GPU data, pivoted DataFrame.
+        limit (int): The number of least used NVLinks to display.
+    Returns:
+        list: list of plots/tables/comments that need to be displayed
+    """
+    plots: List[Renderable] = [
+        'Highest error counts in sum of both T&R selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 100 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.',
+    ]
 
-        activity_timeline = make_subplots()
+    for i in range(4):
+        tx_metric = f'nvl{i}t'
+        rx_metric = f'nvl{i}r'
+        nodes = pivot_gpu_data[[tx_metric, rx_metric]].T.groupby(level=(1, 2)) \
+                    .sum().sum(1).sort_values(ascending=False).iloc[:limit].index
+
+        plot = make_subplots()
+
         for node in nodes:
-            for metric in metric_pair:
-                activity_timeline.add_trace(
+            for metric in [tx_metric, rx_metric]:
+                smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), 100, 1)
+
+                plot.add_trace(
                     go.Scatter(
                         x=pivot_gpu_data.index,
-                        y=signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(),  # drop na otherwise the filter fails,
-                                               100,  # window size used for filtering
-                                               1),  # order of fitted polynomial,
-                        name=f"{node[0]}-GPU{node[1]} T" if metric == tx_metric else f"{node[0]}-GPU{node[1]} R",
-                        # mode='lines+markers',
+                        y=smoothed,
+                        name=f'{node[0]}-GPU{node[1]} {'T' if metric == tx_metric else 'R'}',
                         mode='lines',
                         opacity=0.5,
                         marker=dict(
                             size=5,
-                            line=dict(
-                                width=0.5,
-                            )
+                            line=dict(width=0.5)
                         )
                     ),
                 )
-        activity_timeline.update_layout(title=name)
-        activity_timeline.update_xaxes(title_text='Time')
-        activity_timeline.update_yaxes(title_text='Error count')
-        plots.append(activity_timeline)
+
+        plot.update_layout(title=f'NVL{i}T/R')
+        plot.update_xaxes(title_text='Time')
+        plot.update_yaxes(title_text='Error Count')
+        plots.append(plot)
 
     return plots
 
@@ -636,7 +647,7 @@ def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, co
     return fig, outliers_node
 
 
-def get_net_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
+def get_net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the network statistics from the GPU data.
 
@@ -690,7 +701,7 @@ def get_net_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
     return plots
 
 
-def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
+def get_io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the I/O statistics from the data.
 
@@ -698,11 +709,9 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
         other_data (pd.DataFrame): The input data containing I/O metrics.
 
     Returns:
-        List[List[go.Figure]]: A list of plots for each metric.
+        list: list of plots/tables/comments that need to be displayed
     """
-    # Define the metrics and their labels
-    metrics = ['rchar', 'wchar', 'syscr', 'syscw', 'read_bytes', 'write_bytes', 'cancelled_write_bytes']
-    unit_labels = {
+    metrics = {
         'rchar': 'Bytes Read',
         'wchar': 'Bytes Written',
         'syscr': 'System Calls Read',
@@ -713,9 +722,11 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
     }
 
     # List to store plots for each metric
-    plots = ["In the following plots, we will se for every metric some plots to better understand the data. The first plot is a timeline of the metric over time, the second plot is a histogram of the mean values for each node, and the third plot is a table with the mean values for each node."]
+    plots: List[Renderable] = [
+        'In the following plots, we will se for every metric some plots to better understand the data. The first plot is a timeline of the metric over time, the second plot is a histogram of the mean values for each node, and the third plot is a table with the mean values for each node.',
+    ]
 
-    for metric in metrics:
+    for metric, name in metrics.items():
         # Pivot the DataFrame to reshape it
         df = other_data.pivot(index='timestamp', columns='node_id', values=metric)
 
@@ -727,18 +738,18 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
             df=df,
             y_col=df.columns,  # Pass all columns (one for each node_id)
             title=f"{metric.title()} Over Time",
-            y_label=unit_labels[metric],
+            y_label=name,
             include_std=True,
             gpu=False
         )
 
         # Compute the mean over time for each node
-        mean = df.mean(axis=0).sort_values(ascending=True).rename(f"Mean {unit_labels[metric]}")
+        mean = df.mean(axis=0).sort_values(ascending=True).rename(f"Mean {name}")
 
         # Create a histogram for the distribution of the mean values
         distribution = px.histogram(
             x=mean,
-            labels={'x': unit_labels[metric], 'count': 'Count'},
+            labels={'x': name, 'count': 'Count'},
             title=f"{metric.title()} Distribution"
         )
 
@@ -750,7 +761,7 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
     return plots
 
 
-def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[go.Figure]]:
+def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[Renderable]]:
     """
     Get the temperature, current, power statistics from the CPU data.
 
