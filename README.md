@@ -1,8 +1,9 @@
-# Alps Job Reporting Tool
+# Alps Job Visualization Tool
 
 ## Overview
 
-The Alps Job Reporting Tool is designed to visualize the performance of nodes used in a SLURM job. It provides various graphs to help detect anomalies and identify potential issues in node performance.
+The Alps Job Visualization Tool is designed to record and visualize hardware metrics of nodes used in a SLURM job.
+It provides various graphs to help detect anomalies and identify potential issues in node performance.
 
 ## Features
 

@@ -1,0 +1,12 @@
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
