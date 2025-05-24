@@ -34,16 +34,17 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
         'current_date': now,
         'start_time': start_time,
         'end_time': end_time,
-        'key_statistics': get_key_statistics(gpu_data, anomalies['count'].sum()),
+        # 'key_statistics': get_key_statistics(gpu_data, anomalies['count'].sum()),
+        'key_statistics': get_key_statistics(gpu_data),
         'categories': {
             'GPU Metrics': {
                 'Overview': get_overview_statistics(gpu_data),
                 'Temperature': get_temp_statistics(pivot_gpu_data),
                 'Power': get_power_statistics(pivot_gpu_data),
-                'Activity': get_activity_statistics(gpu_data),
+                # 'Activity': get_activity_statistics(gpu_data),
                 'Utilization': get_utilization_statistics(pivot_gpu_data),
                 'NVLink': get_nvlink_statistics(pivot_gpu_data),
-                'Anomalies': [anomalies],
+                # 'Anomalies': [anomalies],
             },
             'CPU Metrics': {
                 'Current Usage': cpu_stats[0],

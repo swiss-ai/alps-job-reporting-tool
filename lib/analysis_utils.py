@@ -150,7 +150,7 @@ def find_series_outliers(df: pd.DataFrame, y_col: str, n_std=3) -> pd.DataFrame:
         .sort_values('count', ascending=False)
 
 
-def get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
+def old_get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
     """
     Get the key statistics from the GPU data.
 
@@ -183,6 +183,37 @@ def get_key_statistics(gpu_data: pd.DataFrame, anomalies: int) -> List[List]:
             'primary'
         ],
     ]
+
+def get_key_statistics(gpu_data: pd.DataFrame) -> List[List]:
+    """
+    Get the key statistics from the GPU data.
+
+    Args:
+        gpu_data (dict): The GPU data.
+        anomalies (int): The number of anomalies detected.
+
+    Returns:
+        list: [title, value, type] for each key statistic.
+    """
+    duration = gpu_data['timestamp'].max() - gpu_data['timestamp'].min()
+    minutes, seconds = divmod(int(duration.total_seconds()), 60)
+
+    return [
+        [
+            'Total nodes',
+            gpu_data['node_id'].nunique(),
+            'primary'
+        ], [
+            'Total GPUs',
+            gpu_data.groupby(['node_id', 'gpu_id']).ngroups,
+            'primary'
+        ],  [
+            'Reporting Duration (min)',
+            f'{minutes}:{seconds:02d}',  # Format as MM:SS
+            'primary'
+        ],
+    ]
+
 
 
 def get_overview_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
