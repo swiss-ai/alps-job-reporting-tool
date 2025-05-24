@@ -49,7 +49,7 @@ To collect and process data for a given SLURM job, follow these steps:
    ```
 
     - `<job_id>`: The SLURM job ID for which data will be collected.
-    - `[duration]` (optional): The logging period in seconds for node data collection. The default is 300 seconds.
+    - `[duration]` (optional): The logging period in seconds for node data collection. The default is 300 seconds (5 minutes).
 3. The collected data and an HTML report will be saved in the `outputs/<job_id>_<date>` folder.
 
 ### Comments

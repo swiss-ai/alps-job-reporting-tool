@@ -16,10 +16,6 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
     gpu_data, pivot_gpu_data = parse_gpu_data(input_file)
     other_data = parse_other_data(input_file2)
 
-    df = pd.read_parquet(input_file)
-    df.reset_index(inplace=True)
-    df.drop_duplicates(['timestamp', 'node_id', 'gpu_id'], inplace=True)
-
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     start_time = gpu_data['timestamp'].min().strftime('%Y-%m-%d %H:%M:%S')
     end_time = gpu_data['timestamp'].max().strftime('%Y-%m-%d %H:%M:%S')
@@ -39,19 +35,25 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
         'start_time': start_time,
         'end_time': end_time,
         'key_statistics': get_key_statistics(gpu_data, anomalies['count'].sum()),
-        'tabs': {
-            'Overview': get_overview_statistics(gpu_data, df),
-            'Temperature Analysis': get_temp_statistics(pivot_gpu_data),
-            'Power Analysis': get_power_statistics(pivot_gpu_data),
-            'GPUs Activity': get_activity_statistics(gpu_data),
-            'Utilisation': get_utilisation_statistics(pivot_gpu_data),
-            'NVLink Errors': get_nvlink_statistics(pivot_gpu_data),
-            'CPU Current Analysis': cpu_stats[0],
-            'CPU Power Analysis': cpu_stats[1],
-            'CPU Temperature Analysis': cpu_stats[2],
-            'Net Activity': get_net_statistics(other_data),
-            'I/0 Activity': get_io_statistics(other_data),
-            'Anomalies': [anomalies],
+        'categories': {
+            'GPU Metrics': {
+                'Overview': get_overview_statistics(gpu_data),
+                'Temperature': get_temp_statistics(pivot_gpu_data),
+                'Power': get_power_statistics(pivot_gpu_data),
+                'Activity': get_activity_statistics(gpu_data),
+                'Utilization': get_utilisation_statistics(pivot_gpu_data),
+                'NVLink': get_nvlink_statistics(pivot_gpu_data),
+                'Anomalies': [anomalies],
+            },
+            'CPU Metrics': {
+                'Current Usage': cpu_stats[0],
+                'Power Consumption': cpu_stats[1],
+                'Temperature Evolution': cpu_stats[2],
+            },
+            'Network & I/O': {
+                'Network Activity': get_net_statistics(other_data),
+                'I/O Activity': get_io_statistics(other_data),
+            },
         },
     })
 
@@ -72,7 +74,7 @@ def fig_to_html(figure: BaseFigure) -> str:
 
 def main():
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description='Analyze GPU data and generate an HTML report.')
+    parser = argparse.ArgumentParser(description='Analyze metrics and generate an HTML report.')
     parser.add_argument('--input_file', type=str, help='Path to the input Parquet file containing the GPU data.')
     parser.add_argument('--input_file2', type=str, help='Path to the input Parquet file containing all other data.')
     parser.add_argument('--output_file', type=str, default='gpu_report', help='Path to the output HTML report file.')

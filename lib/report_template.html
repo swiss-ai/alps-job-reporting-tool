@@ -134,6 +134,8 @@
             border-bottom: 3px solid transparent;
             transition: all 0.3s ease;
             text-decoration: none;
+            flex: 1 1 0;
+            text-align: center;
         }
 
         .tab-button:hover {
@@ -247,88 +249,112 @@
 
     <div class="stats-container">
         {% for title, value, color in key_statistics %}
-            <div class="stat-card card-{{ color }}">
-                <h3>{{ title }}</h3>
-                <p>{{ value }}</p>
-            </div>
+        <div class="stat-card card-{{ color }}">
+            <h3>{{ title }}</h3>
+            <p>{{ value }}</p>
+        </div>
         {% endfor %}
     </div>
 
     <div class="tab-container">
         <div class="tab-buttons">
-            {% for name, content in tabs.items() %}
-                <a href="#{{ name | slug }}" class="tab-button">{{ name }}</a>
+            {% for title in categories.keys() %}
+            <a href="#{{ title | slug }}" class="tab-button">{{ title }}</a>
             {% endfor %}
         </div>
 
         <!-- Tabs -->
-        {% for name, content in tabs.items() %}
-            <div id="{{ name | slug }}" class="tab-content">
-                <h2>{{ name }}</h2>
+        {% for title, content in categories.items() %}
+        <div id="{{ title | slug }}" class="tab-content">
+            <h2>{{ title }}</h2>
 
-                {% for figure in content %}
-                    {% if figure is string %}
-                        <div class="summary-box">
-                            <p>{{ figure }}</p>
-                        </div>
-                    {% elif figure.columns is defined %}
-                        <div class="table-responsive">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        {% for header in figure.columns %}
-                                            <th>{{ header }}</th>
-                                        {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for _, row in figure.iterrows() %}
-                                        <tr>
-                                            {% for cell in figure.columns %}
-                                                <td>{{ row[cell] }}</td>
-                                            {% endfor %}
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="plot-parent">
-                            {{ figure | plot | safe }}
-                        </div>
-                    {% endif %}
+            {% if content|length > 1 %}
+            <div class="tab-buttons">
+                {% for name in content.keys() %}
+                <a href="#{{ name | slug }}" class="tab-button">{{ name }}</a>
                 {% endfor %}
             </div>
+            {% endif %}
+
+            {% for name, subcontent in content.items() %}
+            <div id="{{ name | slug }}" class="tab-content">
+                {% if name %}<h3>{{ name }}</h3>{% endif %}
+
+                {% for figure in subcontent %}
+                {% if figure is string %}
+                <div class="summary-box">
+                    <p>{{ figure }}</p>
+                </div>
+                {% elif figure.columns is defined %}
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                        <tr>
+                            {% for header in figure.columns %}
+                            <th>{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for _, row in figure.iterrows() %}
+                        <tr>
+                            {% for cell in figure.columns %}
+                            <td>{{ row[cell] }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="plot-parent">
+                    {{ figure | plot | safe }}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
         {% endfor %}
     </div>
 </div>
 
 <script>
     function setActiveTab(tabButton) {
-        document.querySelectorAll('.tab-content').forEach(function (tabContent) {
-            tabContent.classList.add('hidden');
+        const activeTab = document.querySelector(tabButton.getAttribute('href'));
+
+        activeTab.parentNode.querySelectorAll('.tab-content').forEach(function (tabContent) {
+            // Ensure nested tab contents are not hidden
+            if (tabContent.parentNode === activeTab.parentNode) {
+                tabContent.classList.add('hidden');
+            }
         });
 
-        document.querySelectorAll('.tab-button').forEach(function (button) {
+        tabButton.parentNode.querySelectorAll('.tab-button').forEach(function (button) {
             button.classList.remove('active');
         });
 
         tabButton.classList.add('active');
 
-        document.querySelector(tabButton.getAttribute('href')).classList.remove('hidden');
+        activeTab.classList.remove('hidden');
     }
 
     document.querySelectorAll('a.tab-button').forEach(function (tabButton) {
         tabButton.addEventListener('click', function (event) {
             event.preventDefault();
 
-            setActiveTab(tabButton)
+            setActiveTab(tabButton);
         });
     });
 
     // Hide tabs only after complete loading to ensure plots are correctly rendered
     document.addEventListener('DOMContentLoaded', function () {
         setActiveTab(document.querySelector('.tab-button'));
+
+        // For nested tab contents, make sure to set the first tab as active for each
+        document.querySelectorAll('.tab-content').forEach(function (tabContent) {
+            setActiveTab(tabContent.querySelector('.tab-button'));
+        });
     });
 </script>
 
