@@ -23,8 +23,7 @@ IO_SNAPSHOT_SCRIPT="./lib/save_io_metrics.sh"
 
 PYTHON_SCRIPT="./lib/prepare_data.py"
 
-REPORT_SCRIPT="./lib/new_report.py"
-TEMPLATE_FILE="./lib/new_template.html"
+REPORT_SCRIPT="./lib/report.py"
 # ===========================
 
 # Display help message
@@ -125,7 +124,5 @@ OUTPUT_FILE="./outputs/${JOB_ID}_${CURRENT_DATE}/report_${JOB_ID}.html"
 # Start the reporting script once the Python script is done
 echo "-------------"
 echo "Generate report using following command:"
-#echo "python3 \"$REPORT_SCRIPT\" --input_file \"$INPUT_FILE\" --input_file2 \"$INPUT_FILE2\" --template_file \"$TEMPLATE_FILE\" --output_file \"$OUTPUT_FILE\""
-#python3 "$REPORT_SCRIPT" --input_file "$INPUT_FILE" --input_file2 "$INPUT_FILE2"  --template_file "$TEMPLATE_FILE" --output_file "$OUTPUT_FILE"
 echo "python3 \"$REPORT_SCRIPT\" --input_file \"$INPUT_FILE\" --input_file2 \"$INPUT_FILE2\" --output_file \"$OUTPUT_FILE\""
 python3 "$REPORT_SCRIPT" --input_file "$INPUT_FILE" --input_file2 "$INPUT_FILE2" --output_file "$OUTPUT_FILE"

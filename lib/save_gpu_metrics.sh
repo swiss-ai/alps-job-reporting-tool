@@ -19,14 +19,7 @@ CPU_OUTPUT_FILE="${OUTPUT_DIR}/${NODE_NAME}_cpu.log"
 mkdir -p "${OUTPUT_DIR}"
 
 # Define metrics to monitor (e.g., GPU utilization, memory utilization, power usage, temperature)
-# Basic metrics
-#METRICS="1001,1002,1004,150,155"
-
-# Nicola metrics
 METRICS="140,150,155,157,190,191,200,201,203,204,206,207,254,504,858,861,862,1001,1002,1003,1004,1005,1009,1010,1011,1012,1040,1041,1042,1043,1044,1045,1046,1047"
-
-# Imanol metrics
-#METRICS="1001,1002,1004,150,155,1009,1010,1011,1012,1040,1041,1042,1043,1044,1045,1046,1047"
 
 # Duration in seconds
 DURATION=300
@@ -47,26 +40,8 @@ done
 SAMPLES=$((DURATION * 1000 / INTERVAL))
 
 # Start monitoring
-# echo "Starting GPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
-# dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
-#     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
-# done > "${GPU_OUTPUT_FILE}"
-
-# dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
-#     echo "$(date +%s), ${line}"
-# done > "${GPU_OUTPUT_FILE}"
-
 dcgmi dmon -e "${METRICS}" -d "${INTERVAL}" -c "${SAMPLES}" | while read -r line; do
     echo "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ) ${line}"
 done > "${GPU_OUTPUT_FILE}"
 
-
-# Start CPU monitoring and filter for summary lines
-# echo "Starting CPU monitoring on ${NODE_NAME} for ${DURATION} seconds..."
-# top -b -d 1 -n "${DURATION}" | grep -E "Tasks:|%Cpu|MiB Mem|MiB Swap" | while read -r line; do
-#     echo "$(date +%Y-%m-%dT%H:%M:%S.%3N) ${line}"
-# done > "${CPU_OUTPUT_FILE}" &
-# CPU_MONITOR_PID=$!
-
-#echo "Monitoring complete. Output saved to ${OUTPUT_FILE}"
-
+#echo GPU monitoring complete. Output saved to ${OUTPUT_FILE}"
