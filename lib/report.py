@@ -33,26 +33,24 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
         'current_date': now,
         'start_time': start_time,
         'end_time': end_time,
-        'key_statistics': get_key_statistics(gpu_data),
+        'key_statistics': get_key_statistics(gpu_data, other_data),
         'categories': {
             'GPU Metrics': {
-                'Overview': get_overview_statistics(gpu_data),
-                'Temperature': get_temp_statistics(pivot_gpu_data),
-                'Power': get_power_statistics(pivot_gpu_data),
-                'Utilization': get_utilization_statistics(pivot_gpu_data),
-                'NVLink': get_nvlink_statistics(pivot_gpu_data),
+                'Overview': gpu_overview_statistics(gpu_data),
+                'Temperature': gpu_temp_statistics(pivot_gpu_data),
+                'Power': gpu_power_statistics(pivot_gpu_data),
+                'Utilization': gpu_utilization_statistics(pivot_gpu_data),
+                'NVLink': gpu_nvlink_statistics(pivot_gpu_data),
             },
-            'CPU Metrics': dict(zip(
-                [
-                    'Nodes',
-                    'Current Usage',
-                    'Power Consumption',
-                    'Temperature Evolution',
-                ],
-                get_cpu_statistics(other_data))),
+            'CPU Metrics': {
+                'Nodes': cpu_overview_statistics(other_data),
+                'Current Usage': cpu_statistics(other_data, 'curr', 'Current', 'A'),
+                'Power Consumption': cpu_statistics(other_data, 'power', 'Power', 'A'),
+                'Temperature Evolution': cpu_statistics(other_data, 'temp', 'Temperature', '°C'),
+            },
             'Network & I/O': {
-                'Network Activity': get_net_statistics(other_data),
-                'I/O Activity': get_io_statistics(other_data),
+                'Network Activity': net_statistics(other_data),
+                'I/O Activity': io_statistics(other_data),
             },
         },
     })
@@ -73,17 +71,22 @@ def fig_to_html(figure: BaseFigure) -> str:
 
 
 def dataframe_to_table(df: pd.DataFrame) -> str:
-    col = map(lambda x: dict(name=x, width='75px' if x == 'GPU ID' else '150px'), df.columns)
-    rows = df.round(3).values.tolist()
-    return json.dumps(dict(columns=list(col), data=rows, sort=True))
+    col = map(lambda x: dict(name=x, width='85px' if x == 'GPU ID' else '160px'), df.columns)
+    rows = df.dropna().round(3).values.tolist()
+    data = dict(columns=list(col), data=rows, sort=True)
+    # Output minified JSON, used for Grid.js rendering
+    return json.dumps(data, separators=(',', ':'))
 
 
 def main():
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='Analyze metrics and generate an HTML report.')
-    parser.add_argument('--input_file', type=str, help='Path to the input Parquet file containing the GPU data.')
-    parser.add_argument('--input_file2', type=str, help='Path to the input Parquet file containing all other data.')
-    parser.add_argument('--output_file', type=str, default='gpu_report', help='Path to the output HTML report file.')
+    parser.add_argument('--input_file', type=str, required=True,
+                        help='Path to the Parquet file containing GPU data.')
+    parser.add_argument('--input_file2', type=str, required=True,
+                        help='Path to the Parquet file containing all other data.')
+    parser.add_argument('--output_file', type=str, required=True, default='gpu_report',
+                        help='Path to the output HTML report file.')
     args = parser.parse_args()
 
     input_file = args.input_file

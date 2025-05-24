@@ -1,3 +1,4 @@
+import math
 from typing import List, Tuple, Union
 
 import pandas as pd
@@ -53,8 +54,7 @@ def parse_other_data(input_file: str) -> pd.DataFrame:
 
 
 # Visualization functions
-def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int = 5, smoothing_size: int = 10,
-                        table=True, gpu=True) -> go.Figure:
+def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int = 5, smoothing: int = 10) -> go.Figure:
     """
     Plot a time series graph with mean and optional standard deviation.
     Args:
@@ -63,30 +63,25 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
         title (str): Title of the plot.
         y_label (str): Label for the y-axis.
         include_std (bool): Whether to include standard deviation in the plot.
+        limit (int): The maximum number of components to plot.
+        smoothing (int): The size of the smoothing window.
     Returns:
         str: HTML representation of the plot.
     """
 
-    default_color = 'rgba(0.8,0.8,0.8,0.2)'
-
-    # flatten_multilevel column
-    df = df[y_col].copy()
-    if gpu:
-        df.columns = ["_".join(a) for a in df.columns.to_flat_index()]
-
-    mean = df.mean(axis=0)  # Mean over time for fixed node and gpu
-    df['mean'] = df.mean(axis=1)  # Mean over nodes or gpu at fixed time
-    df['std'] = df.std(axis=1)
-    mean.sort_values(ascending=True, inplace=True)
+    node_mean = df[y_col].mean(axis=0)  # Mean for a fixed component
+    time_mean = df[y_col].mean(axis=1)  # Mean for a fixed time
 
     if include_std:
+        time_std = df[y_col].std(axis=1)
+
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
                 x=df.index,
-                y=df['mean'] - 2 * df['std'],
+                y=time_mean - 2 * time_std,
                 mode='lines',
-                line={'width': 0, 'color': default_color},
+                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.2)'),
                 showlegend=False,
                 name='2 Std Dev',
             )
@@ -95,39 +90,41 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
         fig.add_trace(
             go.Scatter(
                 x=df.index,
-                y=df['mean'] + 2 * df['std'],
+                y=time_mean + 2 * time_std,
                 mode='lines',
-                line={'width': 0, 'color': default_color},
+                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.2)'),
                 fill='tonexty',
                 showlegend=False,
                 name='2 Std Dev',
             )
         )
-        # plots top limit and bottom limit of gpus
-        for x in mean.index[-limit:].insert(0, mean.index[:limit]):
+
+        largest = node_mean.nlargest(limit).index
+        smallest = node_mean.nsmallest(limit).index
+
+        # Plots top and bottom limits
+        for x in smallest.union(largest).values:
+            smoothed = signal.savgol_filter(df[y_col][x].dropna(), smoothing, 1)
+
             fig.add_trace(
                 go.Scatter(
                     x=df.index,
-                    # y=df[x].rolling(smoothing_size).mean()
-                    y=signal.savgol_filter(df[x].dropna(),  # drop na otherwise the filter fails
-                                           smoothing_size,  # window size used for filtering
-                                           1),  # maybe 3 is good too
+                    y=smoothed,
                     mode='lines',
-                    line={'width': 0.5},
                     showlegend=True,
-                    name=f"{x.split('_')[0]}-GPU{x.split('_')[1]}" if gpu else x,
+                    name=x if x is str else f'{x[0]}-GPU{x[1]}',
                 )
             )
 
     else:
         fig = px.line(
-            df['mean'],
+            time_mean,
             y=y_col,
-            labels={y_col: y_label, 'time': 'Time'},
-            title=title
+            labels=dict(y_col=y_label, time='Time'),
+            title=title,
         )
 
-    fig.update_traces(line={'width': 0.5})
+    fig.update_traces(line=dict(width=0.75))
     fig.update_layout(title=title, xaxis_title='Time', yaxis_title=y_label)
     return fig
 
@@ -150,7 +147,7 @@ def find_series_outliers(df: pd.DataFrame, y_col: str, n_std=3) -> pd.DataFrame:
         .sort_values('count', ascending=False)
 
 
-def get_key_statistics(gpu_data: pd.DataFrame) -> List[List]:
+def get_key_statistics(gpu_data: pd.DataFrame, other_data: pd.DataFrame) -> List[List]:
     """
     Get the key statistics from the GPU data.
 
@@ -163,17 +160,25 @@ def get_key_statistics(gpu_data: pd.DataFrame) -> List[List]:
     """
     duration = gpu_data['timestamp'].max() - gpu_data['timestamp'].min()
     minutes, seconds = divmod(int(duration.total_seconds()), 60)
+    data_points = gpu_data.count().sum() + other_data.count().sum()
+    # Format number of data points as human-readable format
+    magnitude = min(int(math.log10(data_points)) // 3, 4)
+    suffix = ['', 'K', 'M', 'B', 'T'][magnitude]
 
     return [
         [
-            'Total nodes',
+            'Total Nodes',
             gpu_data['node_id'].nunique(),
             'primary'
         ], [
             'Total GPUs',
             gpu_data.groupby(['node_id', 'gpu_id']).ngroups,
             'primary'
-        ],  [
+        ], [
+            'Data Points',
+            f'{data_points / 10 ** (magnitude * 3):.2f}{suffix}',
+            'primary'
+        ], [
             'Reporting Duration (min)',
             f'{minutes}:{seconds:02d}',  # Format as MM:SS
             'primary'
@@ -181,8 +186,7 @@ def get_key_statistics(gpu_data: pd.DataFrame) -> List[List]:
     ]
 
 
-
-def get_overview_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
+def gpu_overview_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the overview statistics from the GPU data.
 
@@ -228,25 +232,26 @@ def get_overview_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
         'mmtmp': 'Memory Temp (°C)',
     }
     gpu_table = gpu_data.groupby(['node_id', 'gpu_id']).mean() \
-        .reset_index()[columns.keys()].rename(columns=columns).dropna()
+        .reset_index()[columns.keys()].rename(columns=columns)
 
     # Create correlation matrix
-    corr_metrics = ['GRACT', 'SMACT', 'POWER', 'TMPTR', 'PCITX', 'PCIRX', 'NVLTX', 'NVLRX']
+    corr_metrics = ['gract', 'smact', 'power', 'tmptr', 'pcitx', 'pcirx', 'nvltx', 'nvlrx']
+    corr_metrics_labels = [s.upper() for s in corr_metrics]
     corr_plot = px.imshow(
-        gpu_data[map(lambda s: s.lower(), corr_metrics)].corr().round(2),
+        gpu_data[corr_metrics].corr().round(2),
         labels=dict(color='Coolwarm'),
-        x=corr_metrics,
-        y=corr_metrics,
+        x=corr_metrics_labels,
+        y=corr_metrics_labels,
         text_auto=True,
         aspect='auto',
+        title='Metrics Correlation Matrix',
     )
     corr_plot.update_xaxes(side='top')
-    corr_plot.update_layout(title='Metrics Correlation Matrix',)
 
     return [power_vs_tenso_plot, corr_plot, gpu_table]
 
 
-def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
+def gpu_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the temperature statistics from the GPU data.
 
@@ -284,15 +289,13 @@ def get_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
         title='Mean Temperature Distribution',
         opacity=0.7,
     )
-    temp_distribution.update_layout(
-        yaxis_title_text='Count',
-    )
+    temp_distribution.update_layout(yaxis_title='Count')
     plots.append(temp_distribution)
 
     return plots
 
 
-def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
+def gpu_power_statistics(gpu_pivot_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the power statistics from the GPU data.
 
@@ -307,7 +310,7 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     plots: List[Renderable] = [
         'Plot shows the 2 standard deviation interval and the 5 gpus with the lowest and highest mean power usage over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms',
         plot_summary_series(
-            pivot_gpu_data,
+            gpu_pivot_data,
             'power',
             'Power Consumption',
             'Power (W)',
@@ -317,13 +320,11 @@ def get_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
 
     # Power distribution plot
     power_distribution = px.histogram(
-        x=pivot_gpu_data['power'].mean(axis=0),
+        x=gpu_pivot_data['power'].mean(axis=0),
         labels=dict(x='Power (W)'),
         title='Mean Power Distribution',
     )
-    power_distribution.update_layout(
-        yaxis_title_text='Count',
-    )
+    power_distribution.update_layout(yaxis_title='Count')
     plots.append(power_distribution)
 
     return plots
@@ -344,7 +345,7 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
 
     smoothed_tenso = signal.savgol_filter(time_avg['tenso'], 5, 2)  # window size and polynomial order
 
-    activity_timeline = make_subplots(specs=[[{'secondary_y': True}]])
+    activity_timeline = make_subplots(specs=[[dict(secondary_y=True)]])
     activity_timeline.add_trace(
         go.Scatter(
             x=time_avg['time'],
@@ -369,15 +370,14 @@ def get_activity_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
         ),
         secondary_y=True,
     )
-    activity_timeline.update_layout(title='GPU Activity Over Time')
-    activity_timeline.update_xaxes(title_text='Time')
+    activity_timeline.update_layout(title='GPU Activity Over Time', xaxis_title='Time')
     activity_timeline.update_yaxes(title_text='Tensor Core Usage', secondary_y=False)
     activity_timeline.update_yaxes(title_text='Graphic Activity', secondary_y=True)
 
     return [activity_timeline]
 
 
-def get_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> List[Renderable]:
+def gpu_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> List[Renderable]:
     """
     Get the utilization statistics from the GPU data.
     Args:
@@ -415,20 +415,18 @@ def get_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> 
                     opacity=0.5,
                     marker=dict(
                         size=5,
-                        line=dict(width=0.5)
+                        line=dict(width=0.5),
                     )
                 ),
             )
 
-        plot.update_layout(title=name)
-        plot.update_xaxes(title_text='Time')
-        plot.update_yaxes(title_text='Utilization')
+        plot.update_layout(title=name, xaxis_title='Time', yaxis_title='Utilization')
         plots.append(plot)
 
     return plots
 
 
-def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[Renderable]:
+def gpu_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[Renderable]:
     """
     Get the NVLink statistics from the GPU data.
     Args:
@@ -442,22 +440,21 @@ def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[
     ]
 
     for i in range(4):
-        tx_metric = f'nvl{i}t'
-        rx_metric = f'nvl{i}r'
-        nodes = pivot_gpu_data[[tx_metric, rx_metric]].T.groupby(level=(1, 2)) \
+        metrics = [f'nvl{i}t', f'nvl{i}r']
+        nodes = pivot_gpu_data[metrics].T.groupby(level=(1, 2)) \
                     .sum().sum(1).sort_values(ascending=False).iloc[:limit].index
 
         plot = make_subplots()
 
         for node in nodes:
-            for metric in [tx_metric, rx_metric]:
+            for metric in metrics:
                 smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), 100, 1)
 
                 plot.add_trace(
                     go.Scatter(
                         x=pivot_gpu_data.index,
                         y=smoothed,
-                        name=f'{node[0]}-GPU{node[1]} {'T' if metric == tx_metric else 'R'}',
+                        name=f'{node[0]}-GPU{node[1]} {metric[-1].upper()}',
                         mode='lines',
                         opacity=0.5,
                         marker=dict(
@@ -467,90 +464,14 @@ def get_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[
                     ),
                 )
 
-        plot.update_layout(title=f'NVL{i}T/R')
-        plot.update_xaxes(title_text='Time')
-        plot.update_yaxes(title_text='Error Count')
+        plot.update_layout(
+            title=f'NVL{i}T/R',
+            xaxis_title='Time',
+            yaxis_title='Error Count',
+        )
         plots.append(plot)
 
     return plots
-
-
-def find_anomalies(gpu_data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Get the anomaly statistics from the GPU data.
-
-    Args:
-        gpu_data (dict): The GPU data, raw data.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the anomalies.
-    """
-
-    # Power efficiency (tensor operations per watt)
-    gpu_data['efficiency'] = gpu_data['tenso'] / (gpu_data['power'] + 1e-5)
-
-    # Usage balance (ratio of SM active to tensor operations)
-    gpu_data['usage_balance'] = gpu_data['smact'] / (gpu_data['tenso'] + 1e-5)
-
-    node_avg = gpu_data.groupby(['node_id', 'gpu_id']).agg({
-        'gract': 'mean',
-        'smact': 'mean',
-        'tenso': 'mean',
-        'tmptr': 'mean',
-        'power': 'mean'
-    }).reset_index()
-
-    anomalies = []
-    anomalies_types = {
-        'gract': 'Graphic Activity',
-        'tmptr': 'Temperature',
-        'power': 'Power',
-    }
-
-    for col, title in anomalies_types.items():
-        outliers = find_series_outliers(gpu_data, col)
-        outliers['anomaly'] = title
-        anomalies.append(outliers)
-
-    # Combine the anomalies in a unique dataframe
-    anomalies = pd.concat(anomalies, ignore_index=True)
-    # Merge with the node_avg dataframe
-    anomalies = pd.merge(anomalies, node_avg, on=['node_id', 'gpu_id'], how='left')
-    # Group by Node and GPU, concat the 'anomaly' fields
-    return anomalies.groupby(['node_id', 'gpu_id']).agg({
-        'count': 'sum',
-        'anomaly': lambda x: ', '.join(x)
-    }).sort_values('count', ascending=False).reset_index()
-
-
-def anomalies_table(pivot_gpu_data: pd.DataFrame, metric: str, asc=True, limit: int = 5) -> go.Figure:
-    pivot_gpu_data = pivot_gpu_data[metric].copy()
-    pivot_gpu_data.columns = ["_".join(a) for a in pivot_gpu_data.columns.to_flat_index()]
-
-    mean = pivot_gpu_data.mean(axis=0)  # Mean over time for fixed node and gpu
-    mean.sort_values(ascending=asc, inplace=True)
-    fig = go.Figure()
-    mean_df = mean.reset_index().iloc[:limit]
-
-    fig.add_trace(
-        go.Table(
-            name='Lowest Outlier' if asc else 'Highest Outlier',
-            header=dict(
-                values=['gpu', 'mean'],
-                font=dict(size=10),
-                align="left"
-            ),
-            cells=dict(
-                values=[mean_df[k].tolist() for k in mean_df.columns],
-                align="left")
-        ),
-    )
-    fig.update_layout(
-        title=dict(
-            text='Lowest Outlier' if asc else 'Highest Outlier'
-        )
-    )
-    return fig
 
 
 def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, column: str) -> go.Figure:
@@ -647,7 +568,7 @@ def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, co
     return fig, outliers_node
 
 
-def get_net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
+def net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the network statistics from the GPU data.
 
@@ -701,7 +622,7 @@ def get_net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     return plots
 
 
-def get_io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
+def io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the I/O statistics from the data.
 
@@ -721,7 +642,7 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
         'syscw': 'System Calls Write',
         'read_bytes': 'Bytes Read from Disk',
         'write_bytes': 'Bytes Written to Disk',
-        'cancelled_write_bytes': 'Cancelled Write Bytes'
+        'cancelled_write_bytes': 'Cancelled Write Bytes',
     }
 
     for metric, name in metrics.items():
@@ -735,14 +656,13 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
             title=name,
             y_label=name,
             include_std=True,
-            gpu=False
         )
 
         # Create a histogram for the distribution of the mean values
         distribution = px.histogram(
             x=df.mean(axis=0),
             labels=dict(x=name),
-            title=f"Mean {name} Distribution"
+            title=f'Mean {name} Distribution',
         )
 
         # Add the plots to the list
@@ -757,21 +677,20 @@ def get_io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
         'syscw': 'Write Sys Calls',
         'read_bytes': 'Disk Read B',
         'write_bytes': 'Disk Write B',
-        'cancelled_write_bytes': 'Cancelled W. B'
+        'cancelled_write_bytes': 'Cancelled W. B',
     }
     io_table = other_data.groupby('node_id').mean() \
-        .reset_index()[columns.keys()].rename(columns=columns).dropna()
+        .reset_index()[columns.keys()].rename(columns=columns)
     plots.append(io_table)
 
     return plots
 
 
-def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[Renderable]]:
+def cpu_overview_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     """
-    Get the temperature, current, power statistics from the CPU data.
-
+    Get the overview of CPU statistics from the data.
     Args:
-        other_data (dict): The CPU data, raw data.
+        other_data (pd.DataFrame): The input data containing CPU metrics.
 
     Returns:
         list: list of plots/tables/comments that need to be displayed
@@ -789,50 +708,49 @@ def get_cpu_statistics(other_data: pd.DataFrame) -> List[List[Renderable]]:
         'temp_max': 'Temp. Max',
     }
     nodes_table = other_data.groupby('node_id').mean().reset_index()[columns.keys()] \
-        .rename(columns=columns).dropna()
-    nodes_tab: List[Renderable] = [nodes_table]
+        .rename(columns=columns)
 
-    metric_plots = [nodes_tab]
+    return [nodes_table]
 
-    stats = ['max', 'mean', 'min']
-    unit_labels = {'curr': 'Current (A)', 'power': 'Power (W)', 'temp': 'Temperature (°C)'}
-    metrics = ['curr', 'power', 'temp']
 
-    for metric in metrics:
-        cols = [metric + '_' + stat for stat in stats]
-        df = other_data.pivot(index='timestamp', columns=['node_id'], values=cols)
+def cpu_statistics(other_data: pd.DataFrame, metric: str, name: str, unit: str) -> List[Renderable]:
+    """
+    Get the temperature, current, power statistics from the CPU data.
 
-        plots: List[Renderable] = [
-            'Plot shows the 2 standard deviation interval and the 5 cpus with the lowest and highest mean measurements over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 1s',
-        ]
+    Args:
+        other_data (dict): The CPU data, raw data.
+        metric (str): The key for the metric.
+        name (str): The name of the metric.
+        unit (str): The unit of the metric.
 
-        for name, col in zip(
-                [stat.title() for stat in stats],
-                cols):
-            timeline = plot_summary_series(
-                df,
-                y_col=col,
-                title=name + ' ' + metric.title() + ' Over Time',
-                y_label=unit_labels[metric],
-                include_std=True,
-                gpu=False
-            )
+    Returns:
+        list: list of plots/tables/comments that need to be displayed
+    """
+    aggregates = ['max', 'mean', 'min']
+    metrics = {agg: f'{metric}_{agg}' for agg in aggregates}
+    df = other_data.pivot(index='timestamp', columns=['node_id'], values=metrics.values())
 
-            mean = df[col].mean(axis=0)  # Mean over time for fixed node and gpu
-            mean = mean.sort_values(ascending=True).rename('Mean of ' + name.title() + ' ' + unit_labels[metric])
+    plots: List[Renderable] = [
+        'Plot shows the 2 standard deviation interval and the 5 cpus with the lowest and highest mean measurements over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 1s',
+    ]
 
-            distribution = px.histogram(
-                x=mean,
-                labels=dict(x=unit_labels[metric]),
-                title=f'Distribution of {name.title()} {metric.title()}',
-            )
-            distribution.update_layout(
-                yaxis_title_text='Count',
-            )
+    for metric, col in metrics.items():
+        timeline = plot_summary_series(
+            df,
+            y_col=col,
+            title=f'{metric.title()} {name}',
+            y_label=f'{name} ({unit})',
+            include_std=True,
+        )
 
-            plots.append(timeline)
-            plots.append(distribution)
+        distribution = px.histogram(
+            x=df[col].mean(axis=0),
+            labels=dict(x=unit),
+            title=f'Distribution of {metric.title()} {name}',
+        )
+        distribution.update_layout(yaxis_title_text='Count')
 
-        metric_plots.append(plots)
+        plots.append(timeline)
+        plots.append(distribution)
 
-    return metric_plots
+    return plots
