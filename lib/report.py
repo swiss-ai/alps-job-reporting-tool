@@ -50,6 +50,7 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
             'CPU Power Analysis': cpu_stats[1],
             'CPU Temperature Analysis': cpu_stats[2],
             'Net Activity': get_net_statistics(other_data),
+            'I/0 Activity': get_io_statistics(other_data),
             'Anomalies': [anomalies],
         },
     })

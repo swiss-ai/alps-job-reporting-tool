@@ -771,13 +771,14 @@ def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, co
         on='timestamp'
     )
 
-    # Identify outliers (values greater than mean + 2*std)
-    specific_df = specific_df[
-        specific_df[column] > (specific_df[f'{column}_mean'] + 2 * specific_df[f'{column}_std'])
+    # Identify outliers (values greater or lower than mean +- 2*std)
+    outlier_df = specific_df[
+        (specific_df[column] > (specific_df[f'{column}_mean'] + 2 * specific_df[f'{column}_std'])) |
+        (specific_df[column] < (specific_df[f'{column}_mean'] - 2 * specific_df[f'{column}_std']))
     ]
 
     # Group by node_id and count the number of outliers
-    outliers = specific_df.groupby('node_id').size().reset_index(name='outliers')
+    outliers = outlier_df.groupby('node_id').size().reset_index(name='outliers')
 
     # Filter nodes with outliers greater than 10% of the total timestamps
     duration = (new_net_df['timestamp'].max() - new_net_df['timestamp'].min()).total_seconds()
@@ -822,6 +823,18 @@ def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, co
             name='Mean - 2*Std',
         )
     )
+
+    # Add a line for the mean
+    fig.add_trace(
+        go.Scatter(
+            x=specific_df['timestamp'],
+            y=specific_df[f'{column}_mean'],
+            mode='lines',
+            line=dict(color='blue', dash='dash'),
+            name='Mean',
+        )
+    )
+
 
     # Update layout
     fig.update_layout(
@@ -878,11 +891,71 @@ def get_net_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
     # call the function to analyze the outliers for rx_bytes
     rx_bytes_fig, rx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'rx_bytes')
     tx_bytes_fig, tx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'tx_bytes')
-    print(rx_bytes_outliers)
+    #print(rx_bytes_outliers)
     
     # add to plots
     plots.append(rx_bytes_fig)
     plots.append(tx_bytes_fig)
+
+    return plots
+
+
+def get_io_statistics(other_data: pd.DataFrame) -> List[go.Figure]:
+    """
+    Get the I/O statistics from the data.
+
+    Args:
+        other_data (pd.DataFrame): The input data containing I/O metrics.
+
+    Returns:
+        List[List[go.Figure]]: A list of plots for each metric.
+    """
+    # Define the metrics and their labels
+    metrics = ['rchar', 'wchar', 'syscr', 'syscw', 'read_bytes', 'write_bytes', 'cancelled_write_bytes']
+    unit_labels = {
+        'rchar': 'Bytes Read',
+        'wchar': 'Bytes Written',
+        'syscr': 'System Calls Read',
+        'syscw': 'System Calls Write',
+        'read_bytes': 'Bytes Read from Disk',
+        'write_bytes': 'Bytes Written to Disk',
+        'cancelled_write_bytes': 'Cancelled Write Bytes'
+    }
+
+    # List to store plots for each metric
+    plots = ["In the following plots, we will se for every metric some plots to better understand the data. The first plot is a timeline of the metric over time, the second plot is a histogram of the mean values for each node, and the third plot is a table with the mean values for each node."]
+
+    for metric in metrics:
+        # Pivot the DataFrame to reshape it
+        df = other_data.pivot(index='timestamp', columns='node_id', values=metric)
+
+        # Drop rows with NaN values
+        df = df.dropna()
+
+        # Call plot_summary_series to create the timeline plot
+        timeline = plot_summary_series(
+            df=df,
+            y_col=df.columns,  # Pass all columns (one for each node_id)
+            title=f"{metric.title()} Over Time",
+            y_label=unit_labels[metric],
+            include_std=True,
+            gpu=False
+        )
+
+        # Compute the mean over time for each node
+        mean = df.mean(axis=0).sort_values(ascending=True).rename(f"Mean {unit_labels[metric]}")
+
+        # Create a histogram for the distribution of the mean values
+        distribution = px.histogram(
+            x=mean,
+            labels={'x': unit_labels[metric], 'count': 'Count'},
+            title=f"{metric.title()} Distribution"
+        )
+
+        # Add the plots to the list
+        plots.append(timeline)
+        plots.append(distribution)
+        plots.append(mean.reset_index().rename(columns={'index': 'Node ID'}))
 
     return plots
 
