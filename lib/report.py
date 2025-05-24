@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import re
 from datetime import datetime
@@ -19,38 +20,36 @@ def create_report(template_file: str, output_file: str, input_file: str, input_f
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     start_time = gpu_data['timestamp'].min().strftime('%Y-%m-%d %H:%M:%S')
     end_time = gpu_data['timestamp'].max().strftime('%Y-%m-%d %H:%M:%S')
-    anomalies = find_anomalies(gpu_data)
 
     template_loader = jinja2.FileSystemLoader(searchpath=os.path.dirname(__file__))
     template_env = jinja2.Environment(loader=template_loader)
     template_env.filters['slug'] = slugify
     template_env.filters['plot'] = fig_to_html
+    template_env.filters['dataframe'] = dataframe_to_table
 
     template = template_env.get_template(template_file)
-
-    cpu_stats = get_cpu_statistics(other_data)
 
     html_content = template.render(**{
         'current_date': now,
         'start_time': start_time,
         'end_time': end_time,
-        # 'key_statistics': get_key_statistics(gpu_data, anomalies['count'].sum()),
         'key_statistics': get_key_statistics(gpu_data),
         'categories': {
             'GPU Metrics': {
                 'Overview': get_overview_statistics(gpu_data),
                 'Temperature': get_temp_statistics(pivot_gpu_data),
                 'Power': get_power_statistics(pivot_gpu_data),
-                # 'Activity': get_activity_statistics(gpu_data),
                 'Utilization': get_utilization_statistics(pivot_gpu_data),
                 'NVLink': get_nvlink_statistics(pivot_gpu_data),
-                # 'Anomalies': [anomalies],
             },
-            'CPU Metrics': {
-                'Current Usage': cpu_stats[0],
-                'Power Consumption': cpu_stats[1],
-                'Temperature Evolution': cpu_stats[2],
-            },
+            'CPU Metrics': dict(zip(
+                [
+                    'Nodes',
+                    'Current Usage',
+                    'Power Consumption',
+                    'Temperature Evolution',
+                ],
+                get_cpu_statistics(other_data))),
             'Network & I/O': {
                 'Network Activity': get_net_statistics(other_data),
                 'I/O Activity': get_io_statistics(other_data),
@@ -71,6 +70,12 @@ def slugify(value: str) -> str:
 
 def fig_to_html(figure: BaseFigure) -> str:
     return figure.to_html(include_plotlyjs=False, full_html=False)
+
+
+def dataframe_to_table(df: pd.DataFrame) -> str:
+    col = map(lambda x: dict(name=x, width='75px' if x == 'GPU ID' else '150px'), df.columns)
+    rows = df.round(3).values.tolist()
+    return json.dumps(dict(columns=list(col), data=rows, sort=True))
 
 
 def main():

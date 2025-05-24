@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alps Job Report - {{ current_date }}</title>
     <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridjs@6.2.0/dist/gridjs.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css" rel="stylesheet"/>
     <style>
         :root {
             --primary-color: #636efa;
@@ -177,29 +179,6 @@
             max-height: 500px;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: var(--card-bg-color);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            border-radius: 5px;
-        }
-
-        th, td {
-            padding: 0.4rem 0.8rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        th {
-            background-color: rgba(0, 0, 0, 0.03);
-            font-weight: 600;
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
         .row {
             display: flex;
             flex-wrap: wrap;
@@ -286,26 +265,14 @@
                         <p>{{ figure }}</p>
                     </div>
                     {% elif figure.columns is defined %}
+                    {% set table_id = title ~ name ~ loop.index %}
                     <div class="table-responsive">
-                        <table>
-                            <thead>
-                            <tr>
-                                {% for header in figure.columns %}
-                                <th>{{ header }}</th>
-                                {% endfor %}
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for _, row in figure.iterrows() %}
-                            <tr>
-                                {% for cell in figure.columns %}
-                                <td>{{ row[cell] }}</td>
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
+                        <div id="table-{{ table_id }}"></div>
                     </div>
+                    <script>
+                        new gridjs.Grid(JSON.parse('{{ figure | dataframe }}'))
+                            .render(document.getElementById('table-{{ table_id }}'));
+                    </script>
                     {% else %}
                     <div class="plot-parent">
                         {{ figure | plot | safe }}
