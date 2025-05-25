@@ -9,6 +9,7 @@ from scipy import signal
 
 type Renderable = Union[go.Figure, pd.DataFrame, str]
 
+
 # Data manipulation functions
 def parse_gpu_data(input_file: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df = pd.read_parquet(input_file)
@@ -44,8 +45,8 @@ def parse_other_data(input_file: str) -> pd.DataFrame:
     # Convert column names to lowercase
     df.columns = df.columns.str.lower()
 
-    # Remove spaces from column names
-    df.columns = df.columns.str.replace(' ', '')
+    # Trim whitespace from column names
+    df.columns = df.columns.str.strip()
 
     # Convert timestamp to datetime
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
@@ -81,7 +82,7 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
                 x=df.index,
                 y=time_mean - 2 * time_std,
                 mode='lines',
-                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.2)'),
+                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.5)'),
                 showlegend=False,
                 name='2 Std Dev',
             )
@@ -92,7 +93,7 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
                 x=df.index,
                 y=time_mean + 2 * time_std,
                 mode='lines',
-                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.2)'),
+                line=dict(width=0, color='rgba(0.8,0.8,0.8,0.5)'),
                 fill='tonexty',
                 showlegend=False,
                 name='2 Std Dev',
@@ -112,7 +113,7 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
                     y=smoothed,
                     mode='lines',
                     showlegend=True,
-                    name=x if x is str else f'{x[0]}-GPU{x[1]}',
+                    name=x if isinstance(x, str) else f'{x[0]}-GPU{x[1]}',
                 )
             )
 
@@ -124,8 +125,14 @@ def plot_summary_series(df, y_col, title, y_label, include_std=True, limit: int 
             title=title,
         )
 
+    comp = 'GPU' if 'gpu_id' in y_col else 'node'
+    figure_title = dict(
+        text=title,
+        subtitle_text=f'2σ interval & {comp}s with lowest/highest mean (Savitzky-Golay smoothed: window={smoothing}, poly=1)'
+    )
+
     fig.update_traces(line=dict(width=0.75))
-    fig.update_layout(title=title, xaxis_title='Time', yaxis_title=y_label)
+    fig.update_layout(title=figure_title, xaxis_title='Time', yaxis_title=y_label)
     return fig
 
 
@@ -152,8 +159,8 @@ def get_key_statistics(gpu_data: pd.DataFrame, other_data: pd.DataFrame) -> List
     Get the key statistics from the GPU data.
 
     Args:
-        gpu_data (dict): The GPU data.
-        anomalies (int): The number of anomalies detected.
+        gpu_data (dict): The GPU data, raw data.
+        other_data (pd.DataFrame): The other data, raw data.
 
     Returns:
         list: [title, value, type] for each key statistic.
@@ -261,9 +268,7 @@ def gpu_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots: List[Renderable] = [
-        'Plot shows the 2 standard deviation interval and the 5 gpus with the lowest and highest mean temperatures over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms',
-    ]
+    plots: List[Renderable] = []
     metrics = {
         'tmptr': 'Device Temperature',
         'mmtmp': 'Memory Temperature',
@@ -295,39 +300,34 @@ def gpu_temp_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     return plots
 
 
-def gpu_power_statistics(gpu_pivot_data: pd.DataFrame) -> List[Renderable]:
+def gpu_power_statistics(pivot_gpu_data: pd.DataFrame) -> List[Renderable]:
     """
     Get the power statistics from the GPU data.
 
     Args:
-        gpu_pivot_data (pd.DataFrame): The GPU data, pivoted DataFrame.
+        pivot_gpu_data (pd.DataFrame): The GPU data, pivoted DataFrame.
 
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-
     # Power usage plots
-    plots: List[Renderable] = [
-        'Plot shows the 2 standard deviation interval and the 5 gpus with the lowest and highest mean power usage over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms',
-        plot_summary_series(
-            gpu_pivot_data,
-            'power',
-            'Power Consumption',
-            'Power (W)',
-            include_std=True,
-        )
-    ]
+    power_usage = plot_summary_series(
+        pivot_gpu_data,
+        'power',
+        'Power Consumption',
+        'Power (W)',
+        include_std=True,
+    )
 
     # Power distribution plot
     power_distribution = px.histogram(
-        x=gpu_pivot_data['power'].mean(axis=0),
+        x=pivot_gpu_data['power'].mean(axis=0),
         labels=dict(x='Power (W)'),
         title='Mean Power Distribution',
     )
     power_distribution.update_layout(yaxis_title='Count')
-    plots.append(power_distribution)
 
-    return plots
+    return [power_usage, power_distribution]
 
 
 def get_activity_statistics(gpu_data: pd.DataFrame) -> List[Renderable]:
@@ -386,9 +386,8 @@ def gpu_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> 
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots: List[Renderable] = [
-        'Least utilised gpus selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 20 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.',
-    ]
+    plots: List[Renderable] = []
+    smoothing = 20  # Savitzky-Golay smoothing window size
     metrics = {
         'drama': 'Device Memory Interface Utilization',
         'gputl': 'GPU Utilization',
@@ -399,18 +398,18 @@ def gpu_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> 
     }
 
     for metric, name in metrics.items():
-        nodes = (pivot_gpu_data[metric] - 1).sum().sort_values(ascending=True).index[:limit]
+        nodes = (pivot_gpu_data[metric] - 1).sum().nsmallest(limit).index
 
         plot = make_subplots()
 
         for node in nodes:
-            smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), 20, 1)
+            smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), smoothing, 1)
 
             plot.add_trace(
                 go.Scatter(
                     x=pivot_gpu_data.index,
                     y=smoothed,
-                    name=f"{node[0]}-GPU{node[1]}",
+                    name=f'{node[0]}-GPU{node[1]}',
                     mode='lines',
                     opacity=0.5,
                     marker=dict(
@@ -420,7 +419,14 @@ def gpu_utilization_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 5) -> 
                 ),
             )
 
-        plot.update_layout(title=name, xaxis_title='Time', yaxis_title='Utilization')
+        plot.update_layout(
+            title=dict(
+                text=name,
+                subtitle_text=f'GPUs with lowest utilization (Savitzky-Golay smoothed: window={smoothing}, poly=1)'
+            ),
+            xaxis_title='Time',
+            yaxis_title='Utilization',
+        )
         plots.append(plot)
 
     return plots
@@ -435,20 +441,19 @@ def gpu_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots: List[Renderable] = [
-        'Highest error counts in sum of both T&R selected. Savitzky-Golay filter has been applied to the lines plotted with window size = 100 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 100ms.',
-    ]
+    plots: List[Renderable] = []
+    smoothing = 100  # Savitzky-Golay smoothing window size
 
     for i in range(4):
         metrics = [f'nvl{i}t', f'nvl{i}r']
         nodes = pivot_gpu_data[metrics].T.groupby(level=(1, 2)) \
-                    .sum().sum(1).sort_values(ascending=False).iloc[:limit].index
+            .sum().sum(1).nlargest(limit).index
 
         plot = make_subplots()
 
         for node in nodes:
             for metric in metrics:
-                smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), 100, 1)
+                smoothed = signal.savgol_filter(pivot_gpu_data[metric].T.loc[node].dropna(), smoothing, 1)
 
                 plot.add_trace(
                     go.Scatter(
@@ -465,7 +470,10 @@ def gpu_nvlink_statistics(pivot_gpu_data: pd.DataFrame, limit: int = 3) -> List[
                 )
 
         plot.update_layout(
-            title=f'NVL{i}T/R',
+            title=dict(
+                text=f'NVL{i}T/R',
+                subtitle_text=f'GPUs with most T+R errors (Savitzky-Golay smoothed: window={smoothing}, poly=1)'
+            ),
             xaxis_title='Time',
             yaxis_title='Error Count',
         )
@@ -559,13 +567,12 @@ def analyze_net_outliers(mean_std_df: pd.DataFrame, new_net_df: pd.DataFrame, co
 
     # Update layout
     fig.update_layout(
-        title=f"{column.replace('_', ' ').title()} Outliers",
-        xaxis_title="Timestamp",
+        title=f'{column.replace('_', ' ').title()} Outliers',
+        xaxis_title='Time',
         yaxis_title=column.replace('_', ' ').title(),
-        legend_title="Nodes",
     )
 
-    return fig, outliers_node
+    return fig
 
 
 def net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
@@ -578,48 +585,41 @@ def net_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots = []
-    # prepare net_df
-    net_columns = ['timestamp', 'node_id', 'hsn0_rx_bytes', 'hsn1_rx_bytes', 'hsn2_rx_bytes', 'hsn3_rx_bytes', 'nmn0_rx_bytes',
-        'hsn0_rx_errors', 'hsn1_rx_errors', 'hsn2_rx_errors', 'hsn3_rx_errors',
-        'nmn0_rx_errors', 'hsn0_rx_packets', 'hsn1_rx_packets',
-        'hsn2_rx_packets', 'hsn3_rx_packets', 'nmn0_rx_packets',
-        'hsn0_tx_bytes', 'hsn1_tx_bytes', 'hsn2_tx_bytes', 'hsn3_tx_bytes',
-        'nmn0_tx_bytes', 'hsn0_tx_errors', 'hsn1_tx_errors', 'hsn2_tx_errors',
-        'hsn3_tx_errors', 'nmn0_tx_errors', 'hsn0_tx_packets',
-        'hsn1_tx_packets', 'hsn2_tx_packets', 'hsn3_tx_packets',
-        'nmn0_tx_packets']
+    net_columns = [
+        'timestamp', 'node_id',
+        'hsn0_rx_bytes', 'hsn1_rx_bytes', 'hsn2_rx_bytes', 'hsn3_rx_bytes', 'nmn0_rx_bytes',
+        'hsn0_rx_errors', 'hsn1_rx_errors', 'hsn2_rx_errors', 'hsn3_rx_errors', 'nmn0_rx_errors',
+        'hsn0_rx_packets', 'hsn1_rx_packets', 'hsn2_rx_packets', 'hsn3_rx_packets', 'nmn0_rx_packets',
+        'hsn0_tx_bytes', 'hsn1_tx_bytes', 'hsn2_tx_bytes', 'hsn3_tx_bytes', 'nmn0_tx_bytes',
+        'hsn0_tx_errors', 'hsn1_tx_errors', 'hsn2_tx_errors', 'hsn3_tx_errors', 'nmn0_tx_errors',
+        'hsn0_tx_packets', 'hsn1_tx_packets', 'hsn2_tx_packets', 'hsn3_tx_packets', 'nmn0_tx_packets',
+    ]
     net_df = other_data[net_columns]
 
-    # prepare the 2 dataframes needed for the analysis
+    # Prepare the 2 dataframes needed for the analysis
     new_columns = ['timestamp', 'node_id', 'rx_bytes', 'rx_errors', 'rx_packets', 'tx_bytes', 'tx_errors', 'tx_packets']
-    # create a new dataframe with the new columns (created with a mean of the old columns)
+    # Create a new dataframe with the new columns (created with a mean of the old columns)
     new_net_df = pd.DataFrame(columns=new_columns)
-    # copy the timestamp and node_id columns from the old dataframe
+    # Copy the timestamp and node_id columns from the old dataframe
     new_net_df['timestamp'] = net_df['timestamp']
     new_net_df['node_id'] = net_df['node_id']
-    # for every column in the new dataframe combine the columns in the old dataframe
+    # For every column in the new dataframe, combine the columns in the old dataframe
     for column in new_columns[2:]:
         # get the columns that start with the same prefix
         cols = [col for col in net_df.columns if col.endswith(column)]
         # get the mean of the columns
         new_net_df[column] = net_df[cols].sum(axis=1)
 
-    # create a new dataframe with only mean and std for every column (grouped by timestamp)
-    mean_std_df = new_net_df.drop(columns=['node_id']).groupby("timestamp").agg(['mean', 'std']).reset_index()
+    # Create a new dataframe with only mean and std for every column (grouped by timestamp)
+    mean_std_df = new_net_df.drop(columns=['node_id']).groupby('timestamp').agg(['mean', 'std']).reset_index()
     # Flatten the MultiIndex columns in mean_std_df
     mean_std_df.columns = ['_'.join(col).strip('_') if isinstance(col, tuple) else col for col in mean_std_df.columns]
 
-    # call the function to analyze the outliers for rx_bytes
-    rx_bytes_fig, rx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'rx_bytes')
-    tx_bytes_fig, tx_bytes_outliers = analyze_net_outliers(mean_std_df, new_net_df, 'tx_bytes')
-    #print(rx_bytes_outliers)
+    # Call the function to analyze the outliers
+    rx_bytes_fig = analyze_net_outliers(mean_std_df, new_net_df, 'rx_bytes')
+    tx_bytes_fig = analyze_net_outliers(mean_std_df, new_net_df, 'tx_bytes')
 
-    # add to plots
-    plots.append(rx_bytes_fig)
-    plots.append(tx_bytes_fig)
-
-    return plots
+    return [rx_bytes_fig, tx_bytes_fig]
 
 
 def io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
@@ -632,9 +632,7 @@ def io_statistics(other_data: pd.DataFrame) -> List[Renderable]:
     Returns:
         list: list of plots/tables/comments that need to be displayed
     """
-    plots: List[Renderable] = [
-        'In the following plots, we will se for every metric some plots to better understand the data. The first plot is a timeline of the metric over time, the second plot is a histogram of the mean values for each node, and the third plot is a table with the mean values for each node.',
-    ]
+    plots: List[Renderable] = []
     metrics = {
         'rchar': 'Bytes Read',
         'wchar': 'Bytes Written',
@@ -730,9 +728,9 @@ def cpu_statistics(other_data: pd.DataFrame, metric: str, name: str, unit: str) 
     metrics = {agg: f'{metric}_{agg}' for agg in aggregates}
     df = other_data.pivot(index='timestamp', columns=['node_id'], values=metrics.values())
 
-    plots: List[Renderable] = [
-        'Plot shows the 2 standard deviation interval and the 5 cpus with the lowest and highest mean measurements over time. Savitzky-Golay filter has been applied to the lines plotted with window size = 10 and polynomial order = 1. Missing values have been dropped and the smallest time interval between any two data points is 1s',
-    ]
+    plots: List[Renderable] = []
+
+    distribution = go.Figure()
 
     for metric, col in metrics.items():
         timeline = plot_summary_series(
@@ -742,15 +740,22 @@ def cpu_statistics(other_data: pd.DataFrame, metric: str, name: str, unit: str) 
             y_label=f'{name} ({unit})',
             include_std=True,
         )
-
-        distribution = px.histogram(
-            x=df[col].mean(axis=0),
-            labels=dict(x=unit),
-            title=f'Distribution of {metric.title()} {name}',
-        )
-        distribution.update_layout(yaxis_title_text='Count')
-
         plots.append(timeline)
-        plots.append(distribution)
+
+        distribution.add_trace(
+            go.Histogram(
+                x=df[col].mean(axis=0),
+                name=metric.title(),
+                opacity=0.7,
+            )
+        )
+
+    distribution.update_layout(
+        title=f'Mean {name} Distribution',
+        xaxis_title=f'{name} ({unit})',
+        yaxis_title='Count',
+        barmode='overlay',
+    )
+    plots.append(distribution)
 
     return plots

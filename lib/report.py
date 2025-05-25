@@ -71,7 +71,8 @@ def fig_to_html(figure: BaseFigure) -> str:
 
 
 def dataframe_to_table(df: pd.DataFrame) -> str:
-    col = map(lambda x: dict(name=x, width='85px' if x == 'GPU ID' else '160px'), df.columns)
+    col_widths = {'Node ID': 100, 'GPU ID': 85}
+    col = map(lambda x: dict(name=x, width=f'{col_widths.get(x, 160)}px'), df.columns)
     rows = df.dropna().round(3).values.tolist()
     data = dict(columns=list(col), data=rows, sort=True)
     # Output minified JSON, used for Grid.js rendering
