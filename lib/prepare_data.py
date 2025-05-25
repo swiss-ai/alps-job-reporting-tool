@@ -1,111 +1,76 @@
 import argparse
 import os
-import sys
-import pandas as pd
-import numpy as np
 import re
+import sys
 from datetime import datetime
 
-
-# not used anymore
-# def create_df_dict(log_folder):
-#     """ 
-#     Create a dictionary with a dataframe for each node.
-#     The log files are expected to be in the format nid00XXXX.log, where XXXX is the node number.
-#     The function will process each log file and store the resulting dataframe in a dictionary.
-#     The keys of the dictionary will be the node numbers (last 4 digits of the file name before the .log).
-#     The values will be the dataframes.
-#     """
-#     # create a dictionary with a dataframe for each node
-#     log_dict = {}
-
-#     min_time = None
-#     min_node = None
-#     max_time = None
-#     max_node = None
-#     # loop over all files in the folder
-#     for file_name in os.listdir(log_folder):
-#         if file_name.endswith(".log"):
-#             # create the full path to the file
-#             file_path = os.path.join(log_folder, file_name)
-#             # get the number of the node (last 4 digits of the file name before the .log)
-#             node_number = file_name.split(".")[0][-4:]
-#             # process the log file and store the dataframe in the dictionary
-#             #log_dict[node_number] = parse_log_to_dataframe(file_path)
-#             log_dict[node_number] = parse_log_file(file_path)
-
-#     return log_dict, min_time, max_time
+import numpy as np
+import pandas as pd
 
 
 def parse_gpu_file(file_path):
     """Parse a single log file and return a dataframe"""
     try:
         node_id = os.path.basename(file_path).split('_')[0]
-        #print(f"Processing {node_id}")
-        
+
         with open(file_path, 'r') as f:
             lines = f.readlines()
-        
+
         if len(lines) < 3:
-            print(f"  File too short: {len(lines)} lines")
+            print(f'  File too short: {len(lines)} lines')
             return None
-            
+
         # Extract header line
         header_line = lines[0].strip()
         header_parts = re.split(r'\s+', header_line)[2:]  # Skip timestamp and '#Entity'
         headers = ['timestamp', 'node_id', 'gpu_id'] + header_parts
-        
-        # Skip units line (line 1)
-        
+
         # Process data lines (starting from line 2)
         data = []
-        
 
         for i in range(2, len(lines)):
             line = lines[i].strip()
 
             if not line:
                 continue
-                
+
             # Check if this is a GPU line
-            if "GPU" not in line:
+            if 'GPU' not in line:
                 continue
-                
+
             parts = line.split(None, 2)  # Split by whitespace, max 2 splits
             if len(parts) < 3:
                 continue
-                
+
             timestamp_str = parts[0]
             try:
                 timestamp = datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S.%fZ')
 
             except ValueError as e:
-                print(f"Error parsing timestamp: {e}")
-                
+                print(f'Error parsing timestamp: {e}')
+
             # For GPU lines, parts looks like:
-            # ["timestamp", "GPU", "ID  metrics..."]
+            # ['timestamp', 'GPU', 'ID  metrics...']
             remaining = parts[2].split()
-            
-            # First element should be the GPU ID
+
+            # The first element should be the GPU ID
             if len(remaining) < 1:
                 continue
-                
+
             gpu_id = remaining[0]
             metrics = remaining[1:]
-            
+
             # Replace N/A with np.nan
             metrics = [np.nan if x == 'N/A' else x for x in metrics]
-            
+
             # Create a row
             row = [timestamp, node_id, gpu_id] + metrics
             data.append(row)
 
         if not data:
-            print(f"  No valid data rows found in {file_path}")
+            print(f'  No valid data rows found in {file_path}')
             return None
-            
-        #print(f"  Successfully parsed {len(data)} rows from {file_path}")
-        
+
         # Create dataframe
         df = pd.DataFrame(data, columns=headers)
 
@@ -116,18 +81,16 @@ def parse_gpu_file(file_path):
         # Convert timestamp to datetime in the same format as other DataFrames
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
 
-        # Set the index to the timestamp
-        #df.set_index('timestamp', inplace=True)
-        
         # Convert numeric columns to float
         for col in df.columns[3:]:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-        
+
         return df
-    
+
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f'Error processing file {file_path}: {e}')
         return None
+
 
 def process_gpu_logs(dir, limit=None):
     """Process all log files from a directory and return a combined dataframe.
@@ -139,16 +102,16 @@ def process_gpu_logs(dir, limit=None):
 
     # Check if directories exist
     if not os.path.exists(dir):
-        print(f"Warning: Fast run directory does not exist: {dir}")
-    
+        print(f'Warning: Fast run directory does not exist: {dir}')
+
     # Process fast run logs
-    run_files = [os.path.join(dir, file_name) for file_name in os.listdir(dir) if file_name.endswith("gpu.log")]
-    print(f"Found {len(run_files)} GPU log files")
-    
+    run_files = [os.path.join(dir, file_name) for file_name in os.listdir(dir) if file_name.endswith('gpu.log')]
+    print(f'Found {len(run_files)} GPU log files')
+
     if limit is not None and limit > 0:
-        print(f"Limiting to {limit} files per run")
+        print(f'Limiting to {limit} files per run')
         run_files = run_files[:limit]
-    
+
     dfs = []
     for file_path in run_files:
         df = parse_gpu_file(file_path)
@@ -157,11 +120,12 @@ def process_gpu_logs(dir, limit=None):
 
     # Combine all dataframes into one
     combined_df = pd.concat(dfs)
-    
+
     # Sort by timestamp
     combined_df = combined_df.sort_values(by=['timestamp', 'node_id', 'gpu_id'])
-    
+
     return combined_df
+
 
 def parse_cpu_file(file_path):
     """Parse a single CPU log file and return a DataFrame."""
@@ -186,8 +150,9 @@ def parse_cpu_file(file_path):
         return df
 
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f'Error processing file {file_path}: {e}')
         return None
+
 
 def process_cpu_logs(dir, limit=None):
     """Process all log files from a directory and return a combined dataframe.
@@ -199,22 +164,23 @@ def process_cpu_logs(dir, limit=None):
 
     # Check if directories exist
     if not os.path.exists(dir):
-        print(f"Warning: Fast run directory does not exist: {dir}")
-    
+        print(f'Warning: Fast run directory does not exist: {dir}')
+
     # Process fast run logs
-    run_files = [os.path.join(dir, file_name) for file_name in os.listdir(dir) if file_name.endswith("cpu.log")]
-    print(f"Found {len(run_files)} CPU log files")
-    
+    run_files = [os.path.join(dir, file_name) for file_name in os.listdir(dir) if file_name.endswith('cpu.log')]
+    print(f'Found {len(run_files)} CPU log files')
+
     if limit is not None and limit > 0:
-        print(f"Limiting to {limit} files per run")
+        print(f'Limiting to {limit} files per run')
         run_files = run_files[:limit]
-    
+
     dfs = []
     for file_path in run_files:
         df = parse_cpu_file(file_path)
         if df is not None:
-            # group the data by timestamp, node_id and metric_type and aggregate the values (min, max, median, mean)
-            df = df.groupby(['timestamp', 'node_id', 'metric_type']).agg({'value': ['min', 'max', 'median', 'mean']}).reset_index()
+            # Group the data by timestamp, node_id and metric_type and aggregate the values (min, max, median, mean)
+            df = df.groupby(['timestamp', 'node_id', 'metric_type']) \
+                .agg({'value': ['min', 'max', 'median', 'mean']}).reset_index()
             dfs.append(df)
 
     # Combine all dataframes into one
@@ -222,14 +188,6 @@ def process_cpu_logs(dir, limit=None):
 
     # Convert timestamp to datetime
     combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'], unit='s', utc=True)
-    
-    # # Sort by timestamp
-    # combined_df = combined_df.sort_values(by=['timestamp', 'node_id'])
-
-    # # Reset the index after sorting
-    # combined_df = combined_df.reset_index(drop=True)
-    
-    # return combined_df
 
     # Pivot the table to have one row per timestamp and node_id
     combined_df.columns = ['timestamp', 'node_id', 'metric_type', 'min', 'max', 'median', 'mean']
@@ -240,13 +198,14 @@ def process_cpu_logs(dir, limit=None):
     )
 
     # Flatten the multi-level columns
-    pivot_df.columns = [f"{metric_type}_{agg}" for agg, metric_type in pivot_df.columns]
+    pivot_df.columns = [f'{metric_type}_{agg}' for agg, metric_type in pivot_df.columns]
     pivot_df = pivot_df.reset_index()
 
     # Sort by timestamp and node_id
     pivot_df = pivot_df.sort_values(by=['timestamp', 'node_id'])
 
     return pivot_df
+
 
 def parse_cpu_util_file(file_path):
     """
@@ -262,7 +221,7 @@ def parse_cpu_util_file(file_path):
         # Read the log file into a DataFrame
         df = pd.read_csv(file_path)
 
-        # strip whitespace from column names
+        # Strip whitespace from column names
         df.columns = df.columns.str.strip()
 
         # Convert the timestamp to datetime
@@ -274,8 +233,9 @@ def parse_cpu_util_file(file_path):
 
         return df
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f'Error processing file {file_path}: {e}')
         return None
+
 
 def process_cpu_util_logs(directory, limit=None):
     """
@@ -291,19 +251,19 @@ def process_cpu_util_logs(directory, limit=None):
     """
     # Check if the directory exists
     if not os.path.exists(directory):
-        print(f"Directory does not exist: {directory}")
+        print(f'Directory does not exist: {directory}')
         return None
 
     # Find all CPU utilization log files
     cpu_util_files = [
         os.path.join(directory, file_name)
         for file_name in os.listdir(directory)
-        if file_name.endswith("cpu_util.log")
+        if file_name.endswith('cpu_util.log')
     ]
-    print(f"Found {len(cpu_util_files)} CPU utilization log files.")
+    print(f'Found {len(cpu_util_files)} CPU utilization log files.')
 
     if limit is not None and limit > 0:
-        print(f"Limiting to {limit} files.")
+        print(f'Limiting to {limit} files.')
         cpu_util_files = cpu_util_files[:limit]
 
     # Parse each file and calculate differences
@@ -312,7 +272,9 @@ def process_cpu_util_logs(directory, limit=None):
         df = parse_cpu_util_file(file_path)
         if df is not None:
             # Calculate differences for utilization metrics
-            utilization_columns = ['user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq', 'steal', 'guest', 'guest_nice']
+            utilization_columns = [
+                'user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq', 'steal', 'guest', 'guest_nice',
+            ]
             df[utilization_columns] = df[utilization_columns].diff()
 
             # Drop the first row for each node (since diff() produces NaN for the first row)
@@ -330,6 +292,7 @@ def process_cpu_util_logs(directory, limit=None):
     combined_df = combined_df.reset_index(drop=True)
 
     return combined_df
+
 
 def parse_io_file(file_path):
     """
@@ -357,8 +320,9 @@ def parse_io_file(file_path):
 
         return df
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f'Error processing file {file_path}: {e}')
         return None
+
 
 def process_io_logs(directory, limit=None):
     """
@@ -374,19 +338,19 @@ def process_io_logs(directory, limit=None):
     """
     # Check if the directory exists
     if not os.path.exists(directory):
-        print(f"Directory does not exist: {directory}")
+        print(f'Directory does not exist: {directory}')
         return None
 
     # Find all I/O log files
     io_files = [
         os.path.join(directory, file_name)
         for file_name in os.listdir(directory)
-        if file_name.endswith("io.log")
+        if file_name.endswith('io.log')
     ]
-    print(f"Found {len(io_files)} I/O log files.")
+    print(f'Found {len(io_files)} I/O log files.')
 
     if limit is not None and limit > 0:
-        print(f"Limiting to {limit} files.")
+        print(f'Limiting to {limit} files.')
         io_files = io_files[:limit]
 
     # Parse each file and calculate differences
@@ -414,6 +378,7 @@ def process_io_logs(directory, limit=None):
 
     return combined_df
 
+
 def parse_net_file(file_path):
     """
     Parse a single network log file and return a DataFrame.
@@ -440,8 +405,9 @@ def parse_net_file(file_path):
 
         return df
     except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
+        print(f'Error processing file {file_path}: {e}')
         return None
+
 
 def process_net_logs(directory, limit=None):
     """
@@ -457,19 +423,19 @@ def process_net_logs(directory, limit=None):
     """
     # Check if the directory exists
     if not os.path.exists(directory):
-        print(f"Directory does not exist: {directory}")
+        print(f'Directory does not exist: {directory}')
         return None
 
     # Find all network log files
     net_files = [
         os.path.join(directory, file_name)
         for file_name in os.listdir(directory)
-        if file_name.endswith("net.log")
+        if file_name.endswith('net.log')
     ]
-    print(f"Found {len(net_files)} network log files.")
+    print(f'Found {len(net_files)} network log files.')
 
     if limit is not None and limit > 0:
-        print(f"Limiting to {limit} files.")
+        print(f'Limiting to {limit} files.')
         net_files = net_files[:limit]
 
     # Parse each file and collect DataFrames
@@ -490,7 +456,7 @@ def process_net_logs(directory, limit=None):
     )
 
     # Flatten the multi-level columns
-    pivot_df.columns = [f"{interface}_{metric}" for metric, interface in pivot_df.columns]
+    pivot_df.columns = [f'{interface}_{metric}' for metric, interface in pivot_df.columns]
     pivot_df = pivot_df.reset_index()
 
     # Sort by timestamp and node_id
@@ -502,21 +468,21 @@ def process_net_logs(directory, limit=None):
 
     return pivot_df
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Process SLURM job data.")
-    parser.add_argument("--job-id", required=True, help="SLURM Job ID")
+    parser = argparse.ArgumentParser(description='Process SLURM job data.')
+    parser.add_argument('--job-id', required=True, help='SLURM Job ID')
     args = parser.parse_args()
 
-    # get the current date in the format DAY-MONTH-YEAR
-    current_date = datetime.now().strftime("%d-%m-%Y")
-    #current_date = "19-05-2025"
+    # Get the current date in the format DAY-MONTH-YEAR
+    current_date = datetime.now().strftime('%d-%m-%Y')
 
-    # prepare the paths used in the script
-    logs_directory = f"./outputs/{args.job_id}_{current_date}/logs"
-    output_file = f"./outputs/{args.job_id}_{current_date}/data_{args.job_id}_{current_date}"
+    # Prepare the paths used in the script
+    logs_directory = f'./outputs/{args.job_id}_{current_date}/logs'
+    output_file = f'./outputs/{args.job_id}_{current_date}/data_{args.job_id}_{current_date}'
 
     if not os.path.exists(logs_directory):
-        print(f"Directory {logs_directory} does not exist.")
+        print(f'Directory {logs_directory} does not exist.')
         sys.exit(1)
 
     gpu_df = process_gpu_logs(logs_directory)
@@ -533,47 +499,32 @@ def main():
     # Reset the index after merging
     combined_df = combined_df.reset_index(drop=True)
 
-    # strip whitespace from column names
+    # Strip whitespace from column names
     combined_df.columns = combined_df.columns.str.strip()
 
-    # Print the first few rows of the combined DataFrame
-    #print(combined_df.columns)
-    #print(combined_df.head(5))
-
-    # Print amount of rows with at least one NaN value
-    print(f"Number of rows with at least one NaN value: {combined_df.isnull().any(axis=1).sum()}")
-    # Print the indices of those rows
-    #print(f"Indices of rows with at least one NaN value: {combined_df[combined_df.isnull().any(axis=1)].index.tolist()}")
-
-    #print first 5 values of the node_id column for each DataFrame
-    # print(gpu_df.head(5))
-    # print(cpu_df.head(5))
-    #print(cpu_util_df.head(5))
-    # print(io_df.head(5))
-    #print(net_df.head(5))
+    print(f'Number of rows with at least one NaN value: {combined_df.isnull().any(axis=1).sum()}')
 
     if combined_df is not None:
         # Save to CSV the combined DataFrame
-        output_csv = f"{output_file}.csv"
+        output_csv = f'{output_file}.csv'
         combined_df.to_csv(output_csv)
-        print(f"Node data saved to {output_csv}")
-        
+        print(f'Node data saved to {output_csv}')
+
         # Save to parquet (more efficient for large datasets)
-        output_parquet = f"{output_file}.parquet"
+        output_parquet = f'{output_file}.parquet'
         combined_df.to_parquet(output_parquet)
-        print(f"Node data saved to {output_parquet}")
+        print(f'Node data saved to {output_parquet}')
 
         # Save the GPU data to CSV
-        gpu_output_csv = f"{output_file}_gpu.csv"
+        gpu_output_csv = f'{output_file}_gpu.csv'
         gpu_df.to_csv(gpu_output_csv)
-        print(f"GPU data saved to {gpu_output_csv}")
+        print(f'GPU data saved to {gpu_output_csv}')
 
         # Save the GPU data to Parquet
-        gpu_output_parquet = f"{output_file}_gpu.parquet"
+        gpu_output_parquet = f'{output_file}_gpu.parquet'
         gpu_df.to_parquet(gpu_output_parquet)
-        print(f"GPU data saved to {gpu_output_parquet}")
+        print(f'GPU data saved to {gpu_output_parquet}')
 
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
